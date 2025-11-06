@@ -1,6 +1,3 @@
-// main.c
-//#define N_ANCHORS 4 
-
 #include "sdk_config.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -28,10 +25,9 @@
 #include "uart.h"
 #include "hybrid_scalable.h"
 
-// ==================== CẤU HÌNH NODE ====================
-// Định nghĩa NODE_ID khi biên dịch:
-//   make NODE_ID=1   → Tag (initiator)
-//   make NODE_ID=2   → Anchor (responder)
+#define SIMULATION_MODE
+#include "simulation.c"
+
 #ifndef NODE_ID
 #define NODE_ID 1  // Mặc định là Tag nếu không định nghĩa
 #warning "NODE_ID not defined, defaulting to 1 (Tag)"
@@ -40,7 +36,7 @@
 // Tọa độ các anchor (chỉ dùng cho Tag)
 #if NODE_ID == 1
 vec2 anc[N_ANCHORS] = {
-    {5.0, 7.0}, {7.0, 1.0}, {1.0, 5.0}, {7.0, 5.0}
+    {0.0, 0.0}, {5.0, 0.0}, {10.0, 0.0}, {10.0, 5.0}
 };
 
 double phi[N_ANCHORS - 1] = {0};  // Clock offset
@@ -136,6 +132,14 @@ int main(void)
     dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
     dwt_setrxtimeout(65000);
 
+#ifdef SIMULATION_MODE
+    printf("[SIMULATION MODE] Running virtual UWB measurements...\r\n");
+    while (1) {
+        simulate_measurement_cycle();
+        nrf_delay_ms(1000);
+    }
+#else
+
     // === Tạo task UWB phù hợp với NODE_ID ===
 #if NODE_ID == 1
     // Tag: chạy initiator
@@ -152,4 +156,5 @@ int main(void)
 
     // Không bao giờ đến đây
     while (1) {}
+#endif
 }

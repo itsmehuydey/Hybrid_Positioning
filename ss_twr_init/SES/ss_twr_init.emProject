@@ -42,6 +42,7 @@
       <file file_name="../hybrid_scalable.h" />
       <file file_name="../main.c" />
       <file file_name="../config/sdk_config.h" />
+      <file file_name="../simulation.c" />
       <file file_name="../ss_init_main.c" />
       <file file_name="../ss_resp_main.c" />
     </folder>
