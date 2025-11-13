@@ -1,6 +1,6 @@
 Output/nrf52832_xxaa/Obj/ss_twr_init/boards.o: \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\components\boards\boards.c \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\components\boards\boards.h \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\components\boards\boards.c \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\components\boards\boards.h \
  ../../../nRF5_SDK_14.2.0/components/drivers_nrf/hal/nrf_gpio.h \
  ../../../nRF5_SDK_14.2.0/components/device/nrf.h \
  ../../../nRF5_SDK_14.2.0/components/device/nrf52.h \

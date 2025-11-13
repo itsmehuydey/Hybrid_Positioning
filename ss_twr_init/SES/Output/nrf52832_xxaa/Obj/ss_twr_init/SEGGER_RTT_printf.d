@@ -1,7 +1,7 @@
 Output/nrf52832_xxaa/Obj/ss_twr_init/SEGGER_RTT_printf.o: \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\external\segger_rtt\SEGGER_RTT_printf.c \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\external\segger_rtt\SEGGER_RTT.h \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\external\segger_rtt\SEGGER_RTT_Conf.h \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\external\segger_rtt\SEGGER_RTT_printf.c \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\external\segger_rtt\SEGGER_RTT.h \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\external\segger_rtt\SEGGER_RTT_Conf.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/nordic_common.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/app_util_platform.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdint.h \

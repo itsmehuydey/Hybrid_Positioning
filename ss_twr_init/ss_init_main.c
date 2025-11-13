@@ -40,14 +40,14 @@ static volatile int rx_count = 0;
 #define MAX_ANCHORS 8
 
 typedef struct {
-    double toa;       // TOA tại anchor (giây)
-    double distance;  // TOF (mét)
+    double toa;       
+    double distance;  
     int valid;
 } AnchorMeas;
 
 static AnchorMeas meas[MAX_ANCHORS];
 extern vec2 anc[];
-extern double phi[];
+static double phi[N_ANCHORS - 1];
 extern vec2 pos_est;
 extern Kalman2D kf;
 
@@ -55,65 +55,95 @@ int ss_init_run(int anchor_id)
 {
     if (anchor_id < 0 || anchor_id >= MAX_ANCHORS) return 0;
 
+    // --- 1. Gửi Poll ---
+    //printf("\n[Tag] === ss_init_run() start for Anchor %d ===\r\n", anchor_id);
+
     tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);  // Clear TX flag
+
     dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
     dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);
+
+    //printf("[Tag] → Sending POLL to A%d (seq %d)...\r\n", anchor_id, frame_seq_nb);
     dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
     tx_count++;
 
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-    {};
+    // --- 2. Chờ phản hồi hoặc timeout/error ---
+    //printf("[Tag] ...Waiting for RESP from A%d\r\n", anchor_id);
+    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
+             (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
 
+    //printf("[Tag] -> SYS_STATUS = 0x%08lX\r\n", status_reg);
     frame_seq_nb++;
 
+    // --- 3. Nếu nhận được gói phản hồi ---
     if (status_reg & SYS_STATUS_RXFCG)
     {
-        uint32 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+        //printf("[Tag] ✅ RXFCG set -> Frame received OK\r\n");
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
 
-        if (frame_len <= RX_BUF_LEN)
+        int frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+        //printf("[Tag] -> Frame length = %d bytes\r\n", frame_len);
+        if (frame_len <= RX_BUF_LEN) {
             dwt_readrxdata(rx_buffer, frame_len, 0);
+            //printf("[Tag] -> RX Data (first 8 bytes): ");
+            //for (int k=0; k<8 && k<frame_len; k++) {
+            //    printf("%02X ", rx_buffer[k]);
+            //}
+            //printf("\r\n");
+        }
 
+        // Reset seq byte để so sánh chính xác
         rx_buffer[ALL_MSG_SN_IDX] = 0;
+
         if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
         {
-            rx_count++;
+            //printf("[Tag] Correct RESP frame detected from A%d\r\n", anchor_id);
 
+            // --- 4. Tính TOF & Distance ---
             uint32 poll_tx_ts = dwt_readtxtimestamplo32();
             uint32 resp_rx_ts = dwt_readrxtimestamplo32();
             uint32 poll_rx_ts, resp_tx_ts;
-            float clockOffsetRatio = dwt_readcarrierintegrator() * (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6);
-
             resp_msg_get_ts(&rx_buffer[RESP_MSG_POLL_RX_TS_IDX], &poll_rx_ts);
             resp_msg_get_ts(&rx_buffer[RESP_MSG_RESP_TX_TS_IDX], &resp_tx_ts);
 
+            //printf("[Tag] Timestamp poll_tx=%lu, resp_rx=%lu, poll_rx=%lu, resp_tx=%lu\r\n",
+                   //poll_tx_ts, resp_rx_ts, poll_rx_ts, resp_tx_ts);
+
+            float clockOffsetRatio = dwt_readcarrierintegrator() *
+                (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6);
             int32 rtd_init = resp_rx_ts - poll_tx_ts;
             int32 rtd_resp = resp_tx_ts - poll_rx_ts;
 
             tof = ((rtd_init - rtd_resp * (1.0f - clockOffsetRatio)) / 2.0f) * DWT_TIME_UNITS;
             distance = tof * SPEED_OF_LIGHT;
 
-            // LƯU TOA: thời gian poll đến anchor
-            double ti = poll_rx_ts * DWT_TIME_UNITS;
-
-            meas[anchor_id].toa = ti;
+            double toa_from_tag = tof;  // Đây mới là TOA thực sự từ tag
+            meas[anchor_id].toa = toa_from_tag;
+            //meas[anchor_id].toa = ti;
             meas[anchor_id].distance = distance;
             meas[anchor_id].valid = 1;
-
-            printf("A%d: TOA=%.3e s, D=%.3f m\n", anchor_id, ti, distance);
+            printf("[Tag] Distance to A%d = %.2f m\r\n", anchor_id, distance);
             return 1;
+        }
+        else
+        {
+            //printf("[Tag] ⚠ Frame received but NOT valid RESP (wrong header)\r\n");
         }
     }
     else
     {
+        //printf("[Tag] ❌ No response from A%d (timeout or RX error)\r\n", anchor_id);
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         dwt_rxreset();
     }
 
     meas[anchor_id].valid = 0;
+    //printf("[Tag] === ss_init_run() end (FAILED) ===\r\n");
     return 0;
 }
+
+
 
 static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
 {
@@ -137,32 +167,41 @@ void ss_initiator_task_function(void *pvParameter)
     {
         printf("\n=== [HYBRID] Measuring %d Anchors ===\n", N_ANCHORS);
 
-        // 1. Đo tuần tự từng anchor
+        // 1. Đo tuần tự từng anchor N_ANCHORS
         for (int i = 0; i < N_ANCHORS; i++)
         {
             printf("-> Measure Anchor %d...\n", i);
             if (ss_init_run(i))
-                printf("   OK\n");
-            else
-                printf("   FAIL\n");
-            vTaskDelay(80);
+                //printf("   OK\n");
+           // else
+                //printf("   FAIL\n");
+            vTaskDelay(500);
         }
 
-        // 2. Lấy dữ liệu
-        if (!meas[0].valid) { vTaskDelay(100); continue; }
-        t0 = meas[0].toa;
+if (meas[0].valid && meas[1].valid && meas[2].valid && meas[3].valid)
+{
+    double t0 = meas[0].toa;        // TOA anchor 0 (resp_rx_ts)
+    double d0 = meas[0].distance;   // distance anchor 0
 
-        for (int i = 1; i < N_ANCHORS; i++)
-            ti[i-1] = meas[i].valid ? meas[i].toa : t0;  // fallback
+    printf("\n===== CHECK phi =====\n");
 
-        if (meas[a1].valid) d1 = meas[a1].distance;
-        if (meas[a2].valid) d2 = meas[a2].distance;
+    for (int i = 1; i < N_ANCHORS; i++)
+    {
+        double ti = meas[i].toa;
+        double di = meas[i].distance;
 
-        // 3. GỌI THUẬT TOÁN
+        // công thức chuẩn hybrid
+        phi[i-1] = (ti - t0) - (di - d0) / C0;
+
+        printf("phi[%d] = %+10.6e s\n", i-1, phi[i-1]);
+    }
+}
         int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est, &kf);
 
         printf("=> POS: (%.3f, %.3f) | GN: %d it\n", pos_est.x, pos_est.y, it);
 
-        vTaskDelay(500);  // ~2 lần/giây
+        vTaskDelay(1000);  // ~2 lần/giây
     }
+
 }
+

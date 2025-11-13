@@ -1,6 +1,6 @@
 Output/nrf52832_xxaa/Obj/ss_twr_init/bsp_nfc.o: \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\components\libraries\bsp\bsp_nfc.c \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\components\libraries\bsp\bsp_nfc.h \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\components\libraries\bsp\bsp_nfc.c \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\components\libraries\bsp\bsp_nfc.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdint.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL_ConfDefaults.h \
@@ -9,7 +9,7 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/bsp_nfc.o: \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/sdk_errors.h \
  ../../../nRF5_SDK_14.2.0/components/drivers_nrf/nrf_soc_nosd/nrf_error.h \
  ../config/sdk_config.h \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\components\libraries\bsp\bsp.h \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\components\libraries\bsp\bsp.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdbool.h \
  ../../../nRF5_SDK_14.2.0/components/boards/boards.h \
  ../../../nRF5_SDK_14.2.0/components/drivers_nrf/hal/nrf_gpio.h \

@@ -1,5 +1,5 @@
 Output/nrf52832_xxaa/Obj/ss_twr_init/nrf_strerror.o: \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\components\libraries\strerror\nrf_strerror.c \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\components\libraries\strerror\nrf_strerror.c \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/sdk_common.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdint.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL.h \
@@ -35,5 +35,5 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/nrf_strerror.o: \
  ../../../nRF5_SDK_14.2.0/components/device/nrf52_name_change.h \
  ../../../nRF5_SDK_14.2.0/components/device/compiler_abstraction.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/sdk_macros.h \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\nRF5_SDK_14.2.0\components\libraries\strerror\nrf_strerror.h \
+ D:\TN\Hybrid_Positioning\nRF5_SDK_14.2.0\components\libraries\strerror\nrf_strerror.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/sdk_errors.h

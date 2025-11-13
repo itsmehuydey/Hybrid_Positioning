@@ -7,6 +7,7 @@ static void mat4_set_identity(double A[4][4])
         for (int j = 0; j < 4; j++)
             A[i][j] = (i == j) ? 1.0 : 0.0;
 }
+
 static void mat4_mul_vec(double y[4], const double A[4][4], const double x[4])
 {
     for (int i = 0; i < 4; i++) {
@@ -15,18 +16,21 @@ static void mat4_mul_vec(double y[4], const double A[4][4], const double x[4])
         y[i] = s;
     }
 }
+
 static void mat4_add(double C[4][4], const double A[4][4], const double B[4][4])
 {
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++)
             C[i][j] = A[i][j] + B[i][j];
 }
+
 static void mat4_transpose(double T[4][4], const double A[4][4])
 {
     for (int i = 0; i < 4; i++)
         for (int j = 0; j < 4; j++)
             T[j][i] = A[i][j];
 }
+
 static int mat2_inv(double Inv[2][2], const double A[2][2])
 {
     double det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
@@ -36,6 +40,7 @@ static int mat2_inv(double Inv[2][2], const double A[2][2])
     Inv[1][0] = -A[1][0] * id;  Inv[1][1] =  A[0][0] * id;
     return 1;
 }
+
 static void mat4_mul(double C[4][4], const double A[4][4], const double B[4][4])
 {
     for (int i = 0; i < 4; i++)
@@ -45,6 +50,7 @@ static void mat4_mul(double C[4][4], const double A[4][4], const double B[4][4])
             C[i][j] = s;
         }
 }
+
 static void mat4_sub(double C[4][4], const double A[4][4], const double B[4][4])
 {
     for (int i = 0; i < 4; i++)
@@ -235,8 +241,10 @@ int hybrid_localize(const vec2 anc[], int N_anc,
     const int M = N_anc - 1;
     double Delta_d[32];
     for (int i = 0; i < M; ++i) {
-        double t_corr = ti[i] - phi[i];
-        Delta_d[i] = (t_corr - t0) * C0;
+        //double t_corr = ti[i] - phi[i];
+        double tdoa_raw = ti[i] - t0;
+        double tdoa_corr = tdoa_raw - phi[i];  // BÙ CLOCK OFFSET
+        Delta_d[i] = (ti[i] - t0 - phi[i]) * C0;
     }
 
     int idx_tdoa[32];

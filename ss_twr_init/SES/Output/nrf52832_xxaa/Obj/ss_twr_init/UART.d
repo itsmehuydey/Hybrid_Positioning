@@ -1,5 +1,5 @@
 Output/nrf52832_xxaa/Obj/ss_twr_init/UART.o: \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\examples\ss_twr_init\UART\UART.c \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\UART\UART.c \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdbool.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdint.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL.h \
@@ -40,7 +40,7 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/UART.o: \
  ../../../nRF5_SDK_14.2.0/components/drivers_nrf/hal/nrf_peripherals.h \
  ../../../nRF5_SDK_14.2.0/components/device/nrf52832_peripherals.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stddef.h \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\examples\ss_twr_init\UART\UART.h \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\UART\UART.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/bsp/bsp.h \
  ../../../nRF5_SDK_14.2.0/components/boards/boards.h \
  ../../../nRF5_SDK_14.2.0/components/drivers_nrf/hal/nrf_gpio.h \

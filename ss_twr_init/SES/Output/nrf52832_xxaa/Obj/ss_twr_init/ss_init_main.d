@@ -1,5 +1,5 @@
 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\examples\ss_twr_init\ss_init_main.c \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ss_init_main.c \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdio.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL_ConfDefaults.h \
@@ -71,4 +71,4 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
  ../../../nRF5_SDK_14.2.0/components/boards/boards.h \
  ../../../boards/dw1001_dev.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/app_error.h \
- D:\TN\dwm1001-examplesHH\dwm1001-examples-master\examples\ss_twr_init\hybrid_scalable.h
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\hybrid_scalable.h

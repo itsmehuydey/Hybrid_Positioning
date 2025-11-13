@@ -25,21 +25,23 @@
 #include "uart.h"
 #include "hybrid_scalable.h"
 
-#define SIMULATION_MODE
 #include "simulation.c"
 
 #ifndef NODE_ID
-#define NODE_ID 1  // Mặc định là Tag nếu không định nghĩa
+//#define NODE_ID 2 
+#define NODE_ID 1
 #warning "NODE_ID not defined, defaulting to 1 (Tag)"
 #endif
 
 // Tọa độ các anchor (chỉ dùng cho Tag)
 #if NODE_ID == 1
 vec2 anc[N_ANCHORS] = {
-    {0.0, 0.0}, {5.0, 0.0}, {10.0, 0.0}, {10.0, 5.0}
+    {0.0, 0.0},   // A0: góc trái-trước
+    {1.0, 0.0},   // A1: góc phải-trước
+    {1.0, 0.5},   // A2: góc phải-sau
+    {0.0, 0.5}    // A3: góc trái-sau
 };
 
-double phi[N_ANCHORS - 1] = {0};  // Clock offset
 vec2 pos_est = {0, 0};
 Kalman2D kf = {0};
 #endif
@@ -106,7 +108,7 @@ int main(void)
     boUART_Init();
     printf("\r\n=== UWB Hybrid Localization System ===\r\n");
     printf("Node ID: %d ", NODE_ID);
-#if NODE_ID == 1
+#if NODE_ID == 2
     printf("(TAG - Initiator)\r\n");
 #else
     printf("(ANCHOR - Responder)\r\n");
@@ -130,7 +132,7 @@ int main(void)
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
     dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-    dwt_setrxtimeout(65000);
+    dwt_setrxtimeout(0);
 
 #ifdef SIMULATION_MODE
     printf("[SIMULATION MODE] Running virtual UWB measurements...\r\n");
