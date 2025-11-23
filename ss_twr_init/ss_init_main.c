@@ -70,8 +70,10 @@ int ss_init_run(int anchor_id)
 
     // --- 2. Chờ phản hồi hoặc timeout/error ---
     //printf("[Tag] ...Waiting for RESP from A%d\r\n", anchor_id);
+    dwt_setrxtimeout(5000); 
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-             (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {}
+             (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
+              {}
 
     //printf("[Tag] -> SYS_STATUS = 0x%08lX\r\n", status_reg);
     frame_seq_nb++;
@@ -175,32 +177,32 @@ void ss_initiator_task_function(void *pvParameter)
                 //printf("   OK\n");
            // else
                 //printf("   FAIL\n");
-            vTaskDelay(500);
+            vTaskDelay(2000);
         }
 
-if (meas[0].valid && meas[1].valid && meas[2].valid && meas[3].valid)
-{
-    double t0 = meas[0].toa;        // TOA anchor 0 (resp_rx_ts)
-    double d0 = meas[0].distance;   // distance anchor 0
+//if (meas[0].valid && meas[1].valid && meas[2].valid && meas[3].valid)
+//{
+//    double t0 = meas[0].toa;        // TOA anchor 0 (resp_rx_ts)
+//    double d0 = meas[0].distance;   // distance anchor 0
 
-    printf("\n===== CHECK phi =====\n");
+//    printf("\n===== CHECK phi =====\n");
 
-    for (int i = 1; i < N_ANCHORS; i++)
-    {
-        double ti = meas[i].toa;
-        double di = meas[i].distance;
+//    for (int i = 1; i < N_ANCHORS; i++)
+//    {
+//        double ti = meas[i].toa;
+//        double di = meas[i].distance;
 
-        // công thức chuẩn hybrid
-        phi[i-1] = (ti - t0) - (di - d0) / C0;
+//        // công thức chuẩn hybrid
+//        phi[i-1] = (ti - t0) - (di - d0) / C0;
 
-        printf("phi[%d] = %+10.6e s\n", i-1, phi[i-1]);
-    }
-}
-        int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est, &kf);
+//        printf("phi[%d] = %+10.6e s\n", i-1, phi[i-1]);
+//    }
+//}
+//        int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est, &kf);
 
-        printf("=> POS: (%.3f, %.3f) | GN: %d it\n", pos_est.x, pos_est.y, it);
+//        printf("=> POS: (%.3f, %.3f) | GN: %d it\n", pos_est.x, pos_est.y, it);
 
-        vTaskDelay(1000);  // ~2 lần/giây
+//        vTaskDelay(1000);  // ~2 lần/giây
     }
 
 }

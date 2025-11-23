@@ -26,7 +26,7 @@ static uint8 rx_buffer[RX_BUF_LEN];
 static uint32 status_reg = 0;
 
 #define UUS_TO_DWT_TIME 65536
-#define POLL_RX_TO_RESP_TX_DLY_UUS 2500
+#define POLL_RX_TO_RESP_TX_DLY_UUS 1500
 //#define POLL_RX_TO_RESP_TX_DLY_UUS 1100
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 500
 
@@ -221,7 +221,7 @@ int ss_resp_run(void)
         dwt_rxreset();
     }
 
-    //dwt_rxenable(DWT_START_RX_IMMEDIATE);
+    dwt_rxenable(DWT_START_RX_IMMEDIATE);
     printf("[Anchor] -> Listening again...\r\n\n");
     deca_sleep(5);
     return 1;

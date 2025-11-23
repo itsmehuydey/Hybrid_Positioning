@@ -24,7 +24,7 @@
 #include "deca_device_api.h"
 #include "uart.h"
 #include "hybrid_scalable.h"
-
+//#define SIMULATION_MODE
 #include "simulation.c"
 
 #ifndef NODE_ID
@@ -33,13 +33,15 @@
 #warning "NODE_ID not defined, defaulting to 1 (Tag)"
 #endif
 
+
+
 // Tọa độ các anchor (chỉ dùng cho Tag)
 #if NODE_ID == 1
 vec2 anc[N_ANCHORS] = {
     {0.0, 0.0},   // A0: góc trái-trước
-    {1.0, 0.0},   // A1: góc phải-trước
-    {1.0, 0.5},   // A2: góc phải-sau
-    {0.0, 0.5}    // A3: góc trái-sau
+    {2.0, 0.0},   // A1: góc phải-trước
+    {2.0, 1.0},   // A2: góc phải-sau
+    {0.0, 1.0}    // A3: góc trái-sau
 };
 
 vec2 pos_est = {0, 0};
