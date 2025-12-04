@@ -1,4 +1,7 @@
 #include "hybrid_scalable.h"
+#include "FreeRTOS.h"
+#include "task.h"
+
 
 /* ---------- matrix helpers ---------- */
 static void mat4_set_identity(double A[4][4])
@@ -105,10 +108,12 @@ static void compute_jacobian_hybrid(const HybridData *hd, const vec2 *x,
 static int gauss_newton_hybrid(const HybridData *hd, vec2 *x,
                                int max_it, double tol_res, double tol_step)
 {
-    double r[34], G[34][2];
+    static double r[34];
+    static double G[34][2];
     double lambda = 1e-3;
     int it = 0;
     for (; it < max_it; ++it) {
+        if ((it & 3) == 0) vTaskDelay(1);
         int M_tot;
         compute_residual_hybrid(hd, x, r, &M_tot);
         compute_jacobian_hybrid(hd, x, G, M_tot);
@@ -182,14 +187,13 @@ int hybrid_localize(const vec2 anc[], int N_anc,
     }
 
     const int M = N_anc - 1;
-    double Delta_d[32];
+    static double Delta_d[32];
+    static int idx_tdoa[32];
     for (int i = 0; i < M; ++i) {
         double tdoa_raw = ti[i] - t0;
         double tdoa_corr = tdoa_raw - phi[i];
         Delta_d[i] = (ti[i] - t0 - phi[i]) * C0;
     }
-
-    int idx_tdoa[32];
     for (int i = 0; i < M; ++i) idx_tdoa[i] = i + 1;
 
     HybridData hd = {

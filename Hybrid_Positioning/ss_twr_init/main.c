@@ -24,7 +24,7 @@
 #include "deca_device_api.h"
 #include "uart.h"
 #include "hybrid_scalable.h"
-#define SIMULATION_MODE
+//#define SIMULATION_MODE
 #include "simulation.c"
 
 #ifndef NODE_ID

@@ -8,7 +8,7 @@
 #include "port_platform.h"
 
 #ifndef NODE_ID
-#define NODE_ID 1   
+#define NODE_ID 3  
 #endif
 #define MY_ANCHOR_ID  NODE_ID
 

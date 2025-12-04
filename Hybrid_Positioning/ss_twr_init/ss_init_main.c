@@ -63,7 +63,6 @@ int ss_init_run(int anchor_id)
 {
     if (anchor_id < 0 || anchor_id >= MAX_ANCHORS) return 0;
 
-    printf("\n[Tag->A%d] START\r\n", anchor_id);
 
     // ===== 1. RESET TRẠNG THÁI TRƯỚC KHI GỬI =====
     reset_dw1000_state();
@@ -77,11 +76,11 @@ int ss_init_run(int anchor_id)
     dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
     dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);
 
-    printf("[Tag->A%d] → POLL (seq %d)\r\n", anchor_id, frame_seq_nb);
+    //printf("[Tag->A%d] → POLL (seq %d)\r\n", anchor_id, frame_seq_nb);
     
     int ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
     if (ret != DWT_SUCCESS) {
-        printf("[Tag->A%d]  TX FAILED\r\n", anchor_id);
+        //printf("[Tag->A%d]  TX FAILED\r\n", anchor_id);
         reset_dw1000_state();
         return 0;
     }
@@ -96,7 +95,7 @@ int ss_init_run(int anchor_id)
              (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
     {
         if ((xTaskGetTickCount() - wait_start) > max_wait) {
-            printf("[Tag->A%d]  SW TIMEOUT\r\n", anchor_id);
+            //printf("[Tag->A%d]  SW TIMEOUT\r\n", anchor_id);
             reset_dw1000_state();
             return 0;
         }
@@ -115,7 +114,7 @@ int ss_init_run(int anchor_id)
         if (frame_len <= RX_BUF_LEN) {
             dwt_readrxdata(rx_buffer, frame_len, 0);
         } else {
-            printf("[Tag->A%d]  Frame too long (%d)\r\n", anchor_id, frame_len);
+            //printf("[Tag->A%d]  Frame too long (%d)\r\n", anchor_id, frame_len);
             reset_dw1000_state();
             return 0;
         }
@@ -124,7 +123,7 @@ int ss_init_run(int anchor_id)
 
         if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
         {
-            printf("[Tag->A%d]  RESP OK\r\n", anchor_id);
+            //printf("[Tag->A%d]  RESP OK\r\n", anchor_id);
 
             // ===== TÍNH TOF & DISTANCE =====
             uint32 poll_tx_ts = dwt_readtxtimestamplo32();
@@ -157,7 +156,7 @@ int ss_init_run(int anchor_id)
     }
     else
     {
-        printf("[Tag->A%d]  RX FAIL (timeout/error)\r\n", anchor_id);
+        //printf("[Tag->A%d]  RX FAIL (timeout/error)\r\n", anchor_id);
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         dwt_rxreset();
     }
@@ -190,56 +189,95 @@ void ss_initiator_task_function(void *pvParameter)
 
     while (1)
     {
-        printf("    [CYCLE] Measuring %d Anchors\n", N_ANCHORS);
+        //printf("    [CYCLE] Measuring %d Anchors\n", N_ANCHORS);
 
         int success_count = 0;
 
         // ===== ĐO TUẦN TỰ TỪNG ANCHOR =====
         for (int i = 0; i < N_ANCHORS; i++)
         {
-            printf("\n--- [%d/%d] Anchor %d ---\n", i+1, N_ANCHORS, i);
+            //printf("\n--- [%d/%d] Anchor %d ---\n", i+1, N_ANCHORS, i);
             
             if (ss_init_run(i)) {
                 success_count++;
             }
             
             // ===== DELAY GIỮA CÁC LẦN GỬI (QUAN TRỌNG!) =====
-            vTaskDelay(pdMS_TO_TICKS(100));  // 150ms giữa mỗi anchor
+            vTaskDelay(pdMS_TO_TICKS(1000));  // 150ms giữa mỗi anchor
         }
 
         printf(" Success: %d/%d anchors\n", success_count, N_ANCHORS);
 
         // ===== TÍNH TOÁN VỊ TRÍ NẾU ĐỦ DỮ LIỆU =====
-        if (meas[0].valid && meas[1].valid && meas[2].valid && meas[3].valid)
-        {
-            t0 = meas[0].toa;
-            double d0 = meas[0].distance;
+        //if (meas[0].valid && meas[1].valid && meas[2].valid && meas[3].valid)
+        //{
+        //    t0 = meas[0].toa;
+        //    double d0 = meas[0].distance;
 
-            printf("\n🔧 Calculating clock offsets...\n");
-            for (int i = 1; i < N_ANCHORS; i++)
-            {
-                double ti_val = meas[i].toa;
-                double di = meas[i].distance;
-                phi[i-1] = (ti_val - t0) - (di - d0) / C0;
-                ti[i-1] = meas[i].toa;
-                printf("   phi[%d] = %+.3e s\n", i-1, phi[i-1]);
-            }
+        //    printf("\n Calculating clock offsets...\n");
+        //    for (int i = 1; i < N_ANCHORS; i++)
+        //    {
+        //        double ti_val = meas[i].toa;
+        //        double di = meas[i].distance;
+        //        phi[i-1] = (ti_val - t0) - (di - d0) / C0;
+        //        ti[i-1] = meas[i].toa;
+        //        printf("   phi[%d] = %+.3e s\n", i-1, phi[i-1]);
+        //    }
 
-            // Gán distance cho hybrid
-            if (a1 >= 0 && a1 < N_ANCHORS) d1 = meas[a1].distance;
-            if (a2 >= 0 && a2 < N_ANCHORS) d2 = meas[a2].distance;
+        //    // Gán distance cho hybrid
+        //    if (a1 >= 0 && a1 < N_ANCHORS) d1 = meas[a1].distance;
+        //    if (a2 >= 0 && a2 < N_ANCHORS) d2 = meas[a2].distance;
 
-            int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est);
+        //    int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est);
 
-            printf("\n POSITION: (%.3f, %.3f) m | GN: %d iter\n", 
-                   pos_est.x, pos_est.y, it);
-        }
-        else
-        {
-            printf("\n Not enough valid measurements for positioning\n");
-        }
+        //    printf("\n POSITION: (%.3f, %.3f) m | GN: %d iter\n", 
+        //           pos_est.x, pos_est.y, it);
+        //}
+        //else
+        //{
+        //    printf("\n Not enough valid measurements for positioning\n");
+        //}
+        int ok = 1;
+for (int i = 0; i < 4; i++)
+    if (!meas[i].valid) ok = 0;
+
+if (!ok) {
+    printf("\n Not enough valid measurements\n");
+    goto cycle_end;
+}
+
+t0 = meas[0].toa;
+double d0 = meas[0].distance;
+
+printf("\n Calculating clock offsets...\n");
+for (int i = 1; i < 4; i++)
+{
+    double ti_val = meas[i].toa;
+    double di = meas[i].distance;
+    phi[i-1] = (ti_val - t0) - (di - d0) / C0;
+    ti[i-1] = meas[i].toa;
+    printf("   phi[%d] = %+.3e s\n", i-1, phi[i-1]);
+}
+
+if (a1 >= 0 && a1 < N_ANCHORS) d1 = meas[a1].distance;
+if (a2 >= 0 && a2 < N_ANCHORS) d2 = meas[a2].distance;
+
+TickType_t t_start = xTaskGetTickCount();
+int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est);
+
+// tránh GN treo
+if ((xTaskGetTickCount() - t_start) > pdMS_TO_TICKS(50)) {
+    printf("GN too slow → skip\n");
+    goto cycle_end;
+}
+
+printf("\n POSITION: (%.3f, %.3f) m | GN: %d iter\n", 
+        pos_est.x, pos_est.y, it);
+
+cycle_end:
+
 
         // ===== DELAY GIỮA CÁC CHU KỲ ĐO =====
-        vTaskDelay(pdMS_TO_TICKS(100));  // 500ms giữa các cycle
+        //vTaskDelay(pdMS_TO_TICKS(100));  // 500ms giữa các cycle
     }
 }
