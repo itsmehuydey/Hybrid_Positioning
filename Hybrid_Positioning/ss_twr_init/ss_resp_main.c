@@ -8,7 +8,7 @@
 #include "port_platform.h"
 
 #ifndef NODE_ID
-#define NODE_ID 3  
+#define NODE_ID 0  
 #endif
 #define MY_ANCHOR_ID  NODE_ID
 
@@ -139,17 +139,17 @@ int ss_resp_run(void)
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
                 frame_seq_nb++;
                 replied++;
-                printf("[A%d] ✅ RESP sent OK [Stats: rx=%lu, for_me=%lu, replied=%lu, ignored=%lu]\r\n",
+                printf("[A%d]  RESP sent OK [Stats: rx=%lu, for_me=%lu, replied=%lu, ignored=%lu]\r\n",
                        MY_ANCHOR_ID, total_received, for_me, replied, ignored);
             }
             else
             {
-                printf("[A%d] ❌ RESP send FAILED (late)\r\n", MY_ANCHOR_ID);
+                printf("[A%d]  RESP send FAILED (late)\r\n", MY_ANCHOR_ID);
             }
         }
         else
         {
-            printf("[A%d] ⚠ Wrong POLL format\r\n", MY_ANCHOR_ID);
+            printf("[A%d]  Wrong POLL format\r\n", MY_ANCHOR_ID);
         }
     }
     else

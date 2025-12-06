@@ -47,9 +47,9 @@ typedef struct {
 } AnchorMeas;
 
 static AnchorMeas meas[MAX_ANCHORS];
-extern vec2 anc[];
+extern vec3 anc[];
 static double phi[N_ANCHORS - 1];
-extern vec2 pos_est;
+extern vec3 pos_est;
 
 // ===== THÊM HÀM RESET DW1000 =====
 static void reset_dw1000_state(void)
@@ -183,6 +183,8 @@ void ss_initiator_task_function(void *pvParameter)
 
     double t0, ti[N_ANCHORS-1], d1 = -1, d2 = -1;
     int a1 = TOF_A1, a2 = TOF_A2;
+    static double Syn[N_ANCHORS][2];   
+    static int syn_idx = 0;          
 
     printf("\n[Tag]  INITIATOR TASK STARTED \r\n");
     printf("[Tag] Will measure %d anchors continuously\r\n\n", N_ANCHORS);
@@ -207,36 +209,6 @@ void ss_initiator_task_function(void *pvParameter)
         }
 
         printf(" Success: %d/%d anchors\n", success_count, N_ANCHORS);
-
-        // ===== TÍNH TOÁN VỊ TRÍ NẾU ĐỦ DỮ LIỆU =====
-        //if (meas[0].valid && meas[1].valid && meas[2].valid && meas[3].valid)
-        //{
-        //    t0 = meas[0].toa;
-        //    double d0 = meas[0].distance;
-
-        //    printf("\n Calculating clock offsets...\n");
-        //    for (int i = 1; i < N_ANCHORS; i++)
-        //    {
-        //        double ti_val = meas[i].toa;
-        //        double di = meas[i].distance;
-        //        phi[i-1] = (ti_val - t0) - (di - d0) / C0;
-        //        ti[i-1] = meas[i].toa;
-        //        printf("   phi[%d] = %+.3e s\n", i-1, phi[i-1]);
-        //    }
-
-        //    // Gán distance cho hybrid
-        //    if (a1 >= 0 && a1 < N_ANCHORS) d1 = meas[a1].distance;
-        //    if (a2 >= 0 && a2 < N_ANCHORS) d2 = meas[a2].distance;
-
-        //    int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est);
-
-        //    printf("\n POSITION: (%.3f, %.3f) m | GN: %d iter\n", 
-        //           pos_est.x, pos_est.y, it);
-        //}
-        //else
-        //{
-        //    printf("\n Not enough valid measurements for positioning\n");
-        //}
         int ok = 1;
 for (int i = 0; i < 4; i++)
     if (!meas[i].valid) ok = 0;
@@ -246,6 +218,11 @@ if (!ok) {
     goto cycle_end;
 }
 
+for (int i = 0; i < N_ANCHORS; i++) {
+    Syn[i][syn_idx] = meas[i].toa;
+}
+syn_idx = 1 - syn_idx;
+
 t0 = meas[0].toa;
 double d0 = meas[0].distance;
 
@@ -254,7 +231,10 @@ for (int i = 1; i < 4; i++)
 {
     double ti_val = meas[i].toa;
     double di = meas[i].distance;
-    phi[i-1] = (ti_val - t0) - (di - d0) / C0;
+    double Ri = (Syn[i][1] - Syn[i][0]) / (Syn[0][1] - Syn[0][0]);  
+    double DeltaTk = (ti_val - t0) * Ri;
+    phi[i-1] = (ti_val - t0) - DeltaTk;
+
     ti[i-1] = meas[i].toa;
     printf("   phi[%d] = %+.3e s\n", i-1, phi[i-1]);
 }
@@ -271,8 +251,8 @@ if ((xTaskGetTickCount() - t_start) > pdMS_TO_TICKS(50)) {
     goto cycle_end;
 }
 
-printf("\n POSITION: (%.3f, %.3f) m | GN: %d iter\n", 
-        pos_est.x, pos_est.y, it);
+printf("\n POSITION: (%.3f, %.3f, %.3f) m | GN: %d iter\n",
+        pos_est.x, pos_est.y, pos_est.z, it);
 
 cycle_end:
 

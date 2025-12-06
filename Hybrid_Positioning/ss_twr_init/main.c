@@ -24,7 +24,7 @@
 #include "deca_device_api.h"
 #include "uart.h"
 #include "hybrid_scalable.h"
-//#define SIMULATION_MODE
+#define SIMULATION_MODE
 #include "simulation.c"
 
 #ifndef NODE_ID
@@ -35,14 +35,14 @@
 
 // Tọa độ các anchor (chỉ dùng cho Tag)
 #if NODE_ID == 1
-vec2 anc[N_ANCHORS] = {
-    {0.0, 0.0},   // A0: góc trái-trước
-    {2.0, 0.0},   // A1: góc phải-trước
-    {2.0, 1.0},   // A2: góc phải-sau
-    {0.0, 1.0}    // A3: góc trái-sau
+vec3 anc[N_ANCHORS] = {
+    {0.0, 0.0, 2.5},  
+    {2.0, 0.0, 2.5},
+    {2.0, 1.0, 2.5},
+    {0.0, 1.0, 2.5}
 };
 
-vec2 pos_est = {0, 0};
+vec3 pos_est = {0, 0, 1.0}; 
 #endif
 
 // Cấu hình DW1000
@@ -91,7 +91,6 @@ static void led_toggle_timer_callback(void *pvParameter)
 // Forward declarations
 extern void ss_initiator_task_function(void *pvParameter);
 extern void ss_responder_task_function(void *pvParameter);
-
 
 int main(void)
 {
