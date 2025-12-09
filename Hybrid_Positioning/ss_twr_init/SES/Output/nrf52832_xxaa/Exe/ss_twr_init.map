@@ -75,13 +75,16 @@ Discarded input sections
  .rodata.spi    0x00000000        0x8 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .bss.spi_xfer_done
                 0x00000000        0x1 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .rodata.C0     0x00000000        0x8 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .data.tx_poll_msg
                 0x00000000        0xd Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .data.rx_resp_msg
                 0x00000000       0x14 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .data.tx_blink_msg
+                0x00000000        0xd Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .bss.frame_seq_nb
                 0x00000000        0x1 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .bss.g_cycle_id
+                0x00000000        0x2 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .bss.rx_buffer
                 0x00000000       0x14 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .bss.status_reg
@@ -91,32 +94,30 @@ Discarded input sections
  .bss.tx_count  0x00000000        0x4 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .bss.rx_count  0x00000000        0x4 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .bss.meas      0x00000000       0xc0 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .bss.phi       0x00000000       0x18 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .text.reset_dw1000_state
                 0x00000000       0x20 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .rodata        0x00000000      0x14c Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .rodata        0x00000000       0xcc Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .text.ss_init_run
-                0x00000000      0x2cc Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+                0x00000000      0x308 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .text.resp_msg_get_ts
                 0x00000000       0x42 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .text.send_blink_broadcast
+                0x00000000       0x84 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .text.ss_initiator_task_function
-                0x00000000      0x31c Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .bss.syn_idx.1
-                0x00000000        0x4 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .bss.Syn.0     0x00000000       0x40 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .debug_info    0x00000000      0xf37 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .debug_abbrev  0x00000000      0x2b6 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+                0x00000000       0xc8 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .debug_info    0x00000000      0xdbf Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .debug_abbrev  0x00000000      0x296 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .debug_pubnames
-                0x00000000      0x727 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+                0x00000000      0x735 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .debug_pubtypes
-                0x00000000      0x22d Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+                0x00000000      0x249 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .debug_aranges
-                0x00000000       0x38 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .debug_ranges  0x00000000       0x28 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .debug_line    0x00000000      0x54a Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .debug_str     0x00000000      0xad7 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+                0x00000000       0x40 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .debug_ranges  0x00000000       0x30 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .debug_line    0x00000000      0x4cf Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .debug_str     0x00000000      0xaf5 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .comment       0x00000000       0x3e Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
- .debug_frame   0x00000000       0x80 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
+ .debug_frame   0x00000000       0x94 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .ARM.attributes
                 0x00000000       0x36 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
  .text          0x00000000        0x0 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
@@ -146,30 +147,70 @@ Discarded input sections
  .bss.for_me    0x00000000        0x4 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .bss.replied   0x00000000        0x4 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .bss.ignored   0x00000000        0x4 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
- .rodata        0x00000000      0x16a Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+ .rodata        0x00000000      0x182 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .text.ss_resp_run
-                0x00000000      0x2dc Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+                0x00000000      0x338 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .text.get_rx_timestamp_u64
                 0x00000000       0x6e Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .text.resp_msg_set_ts
                 0x00000000       0x54 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .text.ss_responder_task_function
                 0x00000000       0x24 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
- .debug_info    0x00000000      0xcad Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
- .debug_abbrev  0x00000000      0x269 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+ .debug_info    0x00000000      0xd13 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+ .debug_abbrev  0x00000000      0x27e Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .debug_pubnames
-                0x00000000      0x6f7 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+                0x00000000      0x719 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .debug_pubtypes
-                0x00000000      0x223 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+                0x00000000      0x230 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .debug_aranges
                 0x00000000       0x38 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .debug_ranges  0x00000000       0x28 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
- .debug_line    0x00000000      0x425 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
- .debug_str     0x00000000      0xa41 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+ .debug_line    0x00000000      0x452 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+ .debug_str     0x00000000      0xa87 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .comment       0x00000000       0x3e Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .debug_frame   0x00000000       0xa4 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
  .ARM.attributes
                 0x00000000       0x36 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+ .text          0x00000000        0x0 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .data          0x00000000        0x0 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .bss           0x00000000        0x0 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.system_time_ms
+                0x00000000        0xc Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .bss.g_cycle_buf
+                0x00000000      0x500 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .data.g_anchor_ids
+                0x00000000        0x4 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.master_hybrid_init
+                0x00000000       0x18 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.master_hybrid_reset
+                0x00000000        0xa Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.mh_find_or_alloc_slot
+                0x00000000      0x1d4 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.mh_slot_ready_for_hybrid
+                0x00000000       0x5e Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.mh_emit_hybrid
+                0x00000000      0x130 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.mh_try_process_cycles
+                0x00000000       0x7c Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.master_hybrid_handle_ble_data
+                0x00000000       0x90 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .text.master_hybrid_handle_uwb_tdoa
+                0x00000000       0x56 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_info    0x00000000      0x5cd Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_abbrev  0x00000000      0x1e7 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_pubnames
+                0x00000000      0x166 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_pubtypes
+                0x00000000      0x1b2 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_aranges
+                0x00000000       0x60 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_ranges  0x00000000       0x50 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_line    0x00000000      0x434 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_str     0x00000000      0x4a3 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .comment       0x00000000       0x3e Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .debug_frame   0x00000000       0xfc Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
+ .ARM.attributes
+                0x00000000       0x36 Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
  .text          0x00000000        0x0 Output/nrf52832_xxaa/Obj/ss_twr_init/boards.o
  .data          0x00000000        0x0 Output/nrf52832_xxaa/Obj/ss_twr_init/boards.o
  .bss           0x00000000        0x0 Output/nrf52832_xxaa/Obj/ss_twr_init/boards.o
@@ -4919,6 +4960,7 @@ LOAD Output/nrf52832_xxaa/Obj/ss_twr_init/main.o
 LOAD Output/nrf52832_xxaa/Obj/ss_twr_init/simulation.o
 LOAD Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o
 LOAD Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o
+LOAD Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o
 LOAD Output/nrf52832_xxaa/Obj/ss_twr_init/boards.o
 LOAD Output/nrf52832_xxaa/Obj/ss_twr_init/bsp.o
 LOAD Output/nrf52832_xxaa/Obj/ss_twr_init/bsp_nfc.o

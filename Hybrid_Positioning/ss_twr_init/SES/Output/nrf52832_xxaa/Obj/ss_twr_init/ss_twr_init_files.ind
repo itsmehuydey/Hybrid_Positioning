@@ -3,6 +3,7 @@
 "Output/nrf52832_xxaa/Obj/ss_twr_init/simulation.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o"
+"Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/boards.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/bsp.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/bsp_nfc.o"

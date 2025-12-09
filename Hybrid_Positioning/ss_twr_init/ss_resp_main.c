@@ -6,6 +6,7 @@
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
+#include "ble_hybrid.h"
 
 #ifndef NODE_ID
 #define NODE_ID 0  
@@ -16,8 +17,15 @@
 #define RNG_DELAY_MS 5  // Anchor phản hồi nhanh
 #define RX_TIMEOUT_UUS 5000
 
+// ===== MẪU POLL (GIỮ NGUYÊN) =====
 static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0xFF, 0, 0};
 static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+// ===== ĐỊNH NGHĨA BLINK (TDOA) – TAG GỬI BROADCAST =====
+#define BLINK_FUNC_CODE           0xE2
+#define BLINK_MSG_FUNC_IDX        9
+#define BLINK_MSG_CYCLE_LSB_IDX   11
+#define BLINK_MSG_CYCLE_MSB_IDX   12
 
 #define ALL_MSG_COMMON_LEN 10
 #define ALL_MSG_SN_IDX 2
@@ -26,7 +34,6 @@ static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE
 #define RESP_MSG_TS_LEN 4
 
 static uint8 frame_seq_nb = 0;
-
 #define RX_BUF_LEN 24
 static uint8 rx_buffer[RX_BUF_LEN];
 
@@ -36,13 +43,13 @@ static uint32 status_reg = 0;
 #define POLL_RX_TO_RESP_TX_DLY_UUS 2500
 #define RESP_TX_TO_FINAL_RX_DLY_UUS 500
 
-typedef unsigned long long uint64;
 static uint64 poll_rx_ts;
 static uint64 resp_tx_ts;
 
 static uint64 get_rx_timestamp_u64(void);
 static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts);
 static uint64 final_rx_ts = 0;
+
 // ===== THỐNG KÊ =====
 static uint32 total_received = 0;
 static uint32 for_me = 0;
@@ -85,6 +92,26 @@ int ss_resp_run(void)
     // ===== 5. XỬ LÝ FRAME NẾU NHẬN THÀNH CÔNG =====
     if (rx_success)
     {
+        uint8 func_code = rx_buffer[BLINK_MSG_FUNC_IDX];
+
+        // ---------- CASE 1: BLINK (TDOA) ----------
+        if (func_code == BLINK_FUNC_CODE)
+        {
+            uint16 cycle_id = ((uint16)rx_buffer[BLINK_MSG_CYCLE_MSB_IDX] << 8) |
+                              (uint16)rx_buffer[BLINK_MSG_CYCLE_LSB_IDX];
+
+            uint64 blink_rx_ts = get_rx_timestamp_u64();
+
+            printf("[A%d] BLINK: cycle=%u ts=%llu\r\n",
+                   MY_ANCHOR_ID, cycle_id, (unsigned long long)blink_rx_ts);
+
+            // ===== GỬI TDOA (timestamp) VỀ MASTER QUA UWB =====
+            master_hybrid_handle_uwb_tdoa((uint8_t)MY_ANCHOR_ID, cycle_id, blink_rx_ts);
+
+            return 1;  // quay lại lắng nghe gói tiếp theo
+        }
+
+        // ---------- CASE 2: POLL (TWR) – GIỮ NGUYÊN ----------
         uint8 dest_id = rx_buffer[POLL_MSG_DEST_ID_IDX];
 
         printf("[A%d] RX: dest=%d | len=%lu | ", MY_ANCHOR_ID, dest_id, frame_len);
@@ -95,7 +122,7 @@ int ss_resp_run(void)
         if (dest_id != MY_ANCHOR_ID)
         {
             ignored++;
-            printf("[A%d] ⊘ SKIP (not for me) [Stats: rx=%lu, for_me=%lu, replied=%lu, ignored=%lu]\r\n",
+            printf("[A%d] SKIP (not for me) [Stats: rx=%lu, for_me=%lu, replied=%lu, ignored=%lu]\r\n",
                    MY_ANCHOR_ID, total_received, for_me, replied, ignored);
             return 1;  // Không phản hồi, quay lại lắng nghe
         }
@@ -105,16 +132,14 @@ int ss_resp_run(void)
         // ===== KIỂM TRA ĐÚNG POLL MESSAGE =====
         uint8 rx_buffer_check[RX_BUF_LEN];
         memcpy(rx_buffer_check, rx_buffer, frame_len);
-        rx_buffer_check[ALL_MSG_SN_IDX] = 0;
-        rx_buffer_check[POLL_MSG_DEST_ID_IDX] = 0xFF;  // So sánh với mẫu
-
-        
+        rx_buffer_check[ALL_MSG_SN_IDX]        = 0;
+        rx_buffer_check[POLL_MSG_DEST_ID_IDX]  = 0xFF;  // So sánh với mẫu
 
         if (memcmp(rx_buffer_check, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
         {
-            printf("[A%d] ✅ VALID POLL for me!\r\n", MY_ANCHOR_ID);
+            printf("[A%d] VALID POLL for me!\r\n", MY_ANCHOR_ID);
 
-            // ===== TÍNH TIMESTAMP VÀ GỬI RESP =====
+            // ===== TÍNH TIMESTAMP VÀ GỬI RESP (GIỮ NGUYÊN) =====
             poll_rx_ts = get_rx_timestamp_u64();
 
             uint32 resp_tx_time = (poll_rx_ts +
