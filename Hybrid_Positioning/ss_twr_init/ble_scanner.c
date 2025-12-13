@@ -132,3 +132,70 @@ int ble_scan_for_role(uint8_t *new_role)
 
     return 0;
 }
+
+int ble_scan_packet(uint8_t *out, uint16_t *out_len)
+{
+    for (uint8_t ch = 0; ch < 3; ch++)
+    {
+        NRF_RADIO->FREQUENCY   = ble_freqs[ch];
+        NRF_RADIO->DATAWHITEIV = ble_ch_idx[ch];
+        NRF_RADIO->PACKETPTR   = (uint32_t)scan_buf;
+
+        NRF_RADIO->EVENTS_READY = 0;
+        NRF_RADIO->EVENTS_END   = 0;
+
+        NRF_RADIO->TASKS_RXEN = 1;
+        for (volatile int t = 0; t < 20000; t++)
+            if (NRF_RADIO->EVENTS_READY) break;
+
+        if (!NRF_RADIO->EVENTS_READY)
+        {
+            NRF_RADIO->TASKS_DISABLE = 1;
+            continue;
+        }
+
+        NRF_RADIO->TASKS_START = 1;
+
+        for (volatile int t = 0; t < 200000; t++)
+        {
+            if (NRF_RADIO->EVENTS_END)
+            {
+                NRF_RADIO->EVENTS_END = 0;
+
+                // Parse Manufacturer Data 0x0059 → COPY FULL PAYLOAD
+                uint8_t pdu_len = scan_buf[1];
+                uint8_t *p = scan_buf + 8;
+                uint8_t remain = pdu_len - 6;
+
+                while (remain > 0)
+                {
+                    uint8_t fl = p[0];
+                    if (fl == 0 || fl + 1 > remain) break;
+
+                    if (p[1] == 0xFF)
+                    {
+                        uint16_t cid = p[2] | (p[3] << 8);
+                        if (cid == TARGET_CID)
+                        {
+                            uint8_t plen = fl - 3;
+                            memcpy(out, &p[4], plen);
+                            *out_len = plen;
+
+                            NRF_RADIO->TASKS_DISABLE = 1;
+                            return 1;
+                        }
+                    }
+
+                    remain -= (fl + 1);
+                    p += (fl + 1);
+                }
+                break;
+            }
+        }
+
+        NRF_RADIO->TASKS_DISABLE = 1;
+    }
+
+    return 0;
+}
+

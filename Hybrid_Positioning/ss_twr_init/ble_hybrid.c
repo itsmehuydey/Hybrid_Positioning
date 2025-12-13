@@ -1,5 +1,6 @@
 #include "ble_hybrid.h"
 #include <string.h>
+#include "ble_beacon.h" 
 
 // Nếu dùng DWM1001 + FreeRTOS:
 #include "FreeRTOS.h"
@@ -119,23 +120,26 @@ static mh_cycle_slot_t* mh_find_or_alloc_slot(uint16_t cycle_id)
 // Đủ điều kiện để gửi HYBRID?
 static int mh_slot_ready_for_hybrid(const mh_cycle_slot_t *slot)
 {
-    int tdoa_cnt = 0;
-    int tof_cnt  = 0;
+    // TOF: anchor 1 & 2
+    if (!(slot->have_tof[1] && slot->have_tof[0]))
+        return 0;
 
-    for (int i = 0; i < MH_MAX_ANCHORS; i++)
-    {
-        if (slot->have_tdoa[i]) tdoa_cnt++;
-        if (slot->have_tof[i])  tof_cnt++;
-    }
+    // TDOA: anchor 2,3,4 (ref = anchor 1)
+    if (!(slot->have_tdoa[1] &&
+          slot->have_tdoa[2] &&
+          slot->have_tdoa[3]))
+        return 0;
 
-    // Hybrid: cần ít nhất 4 TDOA + 2 TOF
-    return (tdoa_cnt >= 4 && tof_cnt >= 2);
+    return 1;   // ĐỦ ĐẦU VÀO HYBRID
 }
+
 
 
 // Gửi HYBRID 'H' lên gateway
 static void mh_emit_hybrid(const mh_cycle_slot_t *slot)
 {
+     
+
     mh_hybrid_packet_t pkt;
     memset(&pkt, 0, sizeof(pkt));
 
@@ -150,8 +154,8 @@ static void mh_emit_hybrid(const mh_cycle_slot_t *slot)
     pkt.ref_idx = 0; // master = anchor 0
 
     // Bắt buộc phải có timestamp của master
-    if (!slot->have_tdoa[pkt.ref_idx])
-        return;
+    //if (!slot->have_tdoa[pkt.ref_idx])
+        //return;
 
     uint64_t ts_ref = slot->tdoa_ts[pkt.ref_idx];
 
@@ -181,6 +185,10 @@ static void mh_emit_hybrid(const mh_cycle_slot_t *slot)
 
     pkt.tdoa_mask = tdoa_mask;
     pkt.tof_mask  = tof_mask;
+        printf("[MASTER][HYBRID READY] cycle=%u tdoa_mask=0x%02X tof_mask=0x%02X\r\n",
+           slot->cycle_id,
+           pkt.tdoa_mask,
+           pkt.tof_mask);
 
     master_gateway_send((const uint8_t *)&pkt, sizeof(pkt));
 }
@@ -220,12 +228,16 @@ static void mh_try_process_cycles(void)
 
 // TAG gửi TOF về MASTER qua BLE
 void master_hybrid_handle_ble_data(const uint8_t *data, uint16_t len)
-{
+{   
+    printf("[MASTER][BLE RX] len=%u\r\n", len);
     if (data == NULL) return;
     if (len < sizeof(mh_ble_tof_packet_t)) return;
 
     mh_ble_tof_packet_t pkt;
     memcpy(&pkt, data, sizeof(pkt));
+
+    printf("[MASTER][BLE RX] TOF | cycle=%u anchor=%u dist=%.2f m\r\n",
+       pkt.cycle_id, pkt.anchor_id, pkt.distance);
 
     if (pkt.msg_type != 'T') return;
     if (pkt.anchor_id >= MH_MAX_ANCHORS) return;
@@ -234,7 +246,8 @@ void master_hybrid_handle_ble_data(const uint8_t *data, uint16_t len)
 
     slot->dist[pkt.anchor_id]     = pkt.distance;
     slot->have_tof[pkt.anchor_id] = 1;
-
+    printf("[MASTER][HYBRID] TOF stored | cycle=%u anchor=%u\r\n",
+       pkt.cycle_id, pkt.anchor_id);
     mh_try_process_cycles();
 }
 
@@ -252,4 +265,25 @@ void master_hybrid_handle_uwb_tdoa(uint8_t anchor_id,
     slot->have_tdoa[anchor_id] = 1;
 
     mh_try_process_cycles();
+}
+
+
+void master_gateway_send(const uint8_t *data, uint16_t len)
+{
+    const mh_hybrid_packet_t *pkt = (const mh_hybrid_packet_t *)data;
+
+    printf("[GW] HYBRID | cycle=%u tag=%u ref_idx=%u tdoa=0x%02X tof=0x%02X\r\n",
+           pkt->cycle_id,
+           pkt->tag_id,
+           pkt->ref_idx,
+           pkt->tdoa_mask,
+           pkt->tof_mask);
+for (int i = 0; i < 5; i++)
+{
+    ble_raw_beacon_send_payload(
+        (const uint8_t *)pkt,
+        sizeof(mh_hybrid_packet_t)
+    );
+    vTaskDelay(pdMS_TO_TICKS(20));   // 20 ms
+}
 }

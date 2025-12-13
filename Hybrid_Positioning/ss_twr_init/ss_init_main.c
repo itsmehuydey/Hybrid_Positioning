@@ -151,9 +151,13 @@ int ss_init_run(int anchor_id)
             ble_pkt.anchor_id  = (uint8_t)anchor_id;
             ble_pkt.cycle_id   = g_cycle_id;
             ble_pkt.distance   = (float)distance;
-
+            for (int i = 0; i < 5; i++)
+{
             ble_raw_beacon_send_payload((uint8_t*)&ble_pkt, sizeof(mh_ble_tof_packet_t));
-
+    vTaskDelay(pdMS_TO_TICKS(20));   // 20 ms
+}
+            printf("[TAG][BLE TX] TOF -> MASTER | cycle=%u anchor=%d dist=%.2f m\r\n",
+       g_cycle_id, anchor_id, distance);
             reset_dw1000_state();
             return 1;
         }
@@ -224,7 +228,7 @@ void ss_initiator_task_function(void *pvParameter)
             if (ss_init_run(i)) {
                 success_count++;
             }
-            vTaskDelay(pdMS_TO_TICKS(1000));
+            vTaskDelay(pdMS_TO_TICKS(100));
         }
 
         printf(" Success: %d/%d anchors\n", success_count, MAX_ANCHORS);

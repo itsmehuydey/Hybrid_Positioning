@@ -84,6 +84,7 @@ void master_hybrid_handle_uwb_tdoa(uint8_t anchor_id,
 // Hàm bạn tự implement bên ngoài để gửi lên Gateway
 void master_gateway_send(const uint8_t *data, uint16_t len);
 
+
 #ifdef __cplusplus
 }
 #endif

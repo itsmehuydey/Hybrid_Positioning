@@ -13,5 +13,5 @@ void ble_scanner_init(void);
  * @param new_role: byte payload gửi từ beacon
  */
 int ble_scan_for_role(uint8_t *new_role);
-
+int ble_scan_packet(uint8_t *out, uint16_t *out_len);
 #endif
