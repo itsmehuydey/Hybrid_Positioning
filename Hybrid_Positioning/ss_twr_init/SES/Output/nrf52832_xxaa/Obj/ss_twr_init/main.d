@@ -80,4 +80,7 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/main.o: \
  ../../../deca_driver/deca_types.h ../../../deca_driver/deca_regs.h \
  ../../../deca_driver/deca_version.h ../UART/uart.h \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\hybrid_scalable.h \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_beacon.h \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_scanner.h \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_hybrid.h \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\simulation.c

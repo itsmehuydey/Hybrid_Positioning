@@ -37,7 +37,6 @@ typedef struct
     uint8_t  msg_type;   // 'T' = TOF packet
     uint8_t  anchor_id;  // ID anchor tương ứng khoảng cách
     uint16_t cycle_id;   // ID chu kỳ đo
-    float    tof;        // ToF (giây)
     float    distance;   // Khoảng cách (m)
 
 } mh_ble_tof_packet_t;
@@ -48,20 +47,22 @@ typedef struct
 
 typedef struct
 {
-    uint8_t  msg_type;          // 'H'
-    uint16_t cycle_id;          // Chu kỳ tương ứng
+    uint8_t  msg_type;      // 'H'
+    uint16_t cycle_id;      // Chu kỳ tương ứng
 
-    uint8_t  tag_id;            // ID của TAG
-    uint8_t  anchor_ids[MH_MAX_ANCHORS]; // Danh sách ID anchor thực tế
+    uint8_t  tag_id;        // ID của TAG
 
-    uint8_t  tdoa_mask;         // bitmask anchor có TDOA
-    uint8_t  tof_mask;          // bitmask anchor có TOF
+    uint8_t  anchor_ids[MH_MAX_ANCHORS]; // (optional) mapping index -> ID thực tế
+    uint8_t  ref_idx;       // index ref trong mảng (0 = master)
 
-    uint64_t tdoa_ts[MH_MAX_ANCHORS]; // timestamp từ anchors
-    float    dist[MH_MAX_ANCHORS];    // khoảng cách (m)
-    float    tof[MH_MAX_ANCHORS];     // ToF (s)
+    uint8_t  tdoa_mask;     // bit i = 1 → có Δd_i
+    uint8_t  tof_mask;      // bit i = 1 → có d_i
+
+    float    delta_d[MH_MAX_ANCHORS]; // Δd_i (m) = (ts_i - ts_ref)*c
+    float    dist[MH_MAX_ANCHORS];    // d_i (m) từ TOF
 
 } mh_hybrid_packet_t;
+
 
 #pragma pack(pop)
 

@@ -4,6 +4,14 @@
 // Nếu dùng DWM1001 + FreeRTOS:
 #include "FreeRTOS.h"
 #include "task.h"
+#ifndef SPEED_OF_LIGHT
+#define SPEED_OF_LIGHT   299702547.0f
+#endif
+
+#ifndef DWT_TIME_UNITS
+// 1 tick DW1000 ~ 1 / (499.2e6 * 128)
+#define DWT_TIME_UNITS   (1.0/499.2e6/128.0)
+#endif
 
 // ================== CẤU HÌNH TIMEOUT ==================
 
@@ -133,41 +141,50 @@ static void mh_emit_hybrid(const mh_cycle_slot_t *slot)
 
     pkt.msg_type = 'H';
     pkt.cycle_id = slot->cycle_id;
+    pkt.tag_id   = TAG_ID;
 
-    // Gán ID TAG
-    pkt.tag_id = TAG_ID;
-
-    // Gán danh sách Anchor ID thực tế (mapping index -> ID)
+    // mapping index -> anchor ID thực
     for (int i = 0; i < MH_MAX_ANCHORS; i++)
-    {
         pkt.anchor_ids[i] = g_anchor_ids[i];
-    }
+
+    pkt.ref_idx = 0; // master = anchor 0
+
+    // Bắt buộc phải có timestamp của master
+    if (!slot->have_tdoa[pkt.ref_idx])
+        return;
+
+    uint64_t ts_ref = slot->tdoa_ts[pkt.ref_idx];
 
     uint8_t tdoa_mask = 0;
     uint8_t tof_mask  = 0;
 
     for (int i = 0; i < MH_MAX_ANCHORS; i++)
     {
-        if (slot->have_tdoa[i])
+        /* ===== TDOA ===== */
+        if (i != pkt.ref_idx && slot->have_tdoa[i])
         {
+            int64_t dt = (int64_t)(slot->tdoa_ts[i] - ts_ref);
+
+            pkt.delta_d[i] =
+                (float)((double)dt * DWT_TIME_UNITS * (double)SPEED_OF_LIGHT);
+
             tdoa_mask |= (uint8_t)(1u << i);
-            pkt.tdoa_ts[i] = slot->tdoa_ts[i];
         }
 
+        /* ===== TOF ===== */
         if (slot->have_tof[i])
         {
-            tof_mask |= (uint8_t)(1u << i);
             pkt.dist[i] = slot->dist[i];
-            pkt.tof[i]  = slot->tof[i];
+            tof_mask |= (uint8_t)(1u << i);
         }
     }
 
     pkt.tdoa_mask = tdoa_mask;
     pkt.tof_mask  = tof_mask;
 
-    // Gửi gói HYBRID lên Gateway (BLE/WiFi/UART tuỳ bạn hiện thực)
     master_gateway_send((const uint8_t *)&pkt, sizeof(pkt));
 }
+
 
 
 // Sau mỗi lần cập nhật buffer thì kiểm tra slot nào đủ điều kiện / timeout
@@ -215,7 +232,6 @@ void master_hybrid_handle_ble_data(const uint8_t *data, uint16_t len)
 
     mh_cycle_slot_t *slot = mh_find_or_alloc_slot(pkt.cycle_id);
 
-    slot->tof[pkt.anchor_id]      = pkt.tof;
     slot->dist[pkt.anchor_id]     = pkt.distance;
     slot->have_tof[pkt.anchor_id] = 1;
 

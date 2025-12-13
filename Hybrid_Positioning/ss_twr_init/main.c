@@ -24,7 +24,10 @@
 #include "deca_device_api.h"
 #include "uart.h"
 #include "hybrid_scalable.h"
-#define SIMULATION_MODE
+#include "ble_beacon.h"
+#include "ble_scanner.h"
+#include "ble_hybrid.h"
+//#define SIMULATION_MODE
 #include "simulation.c"
 
 #ifndef NODE_ID
@@ -92,8 +95,10 @@ static void led_toggle_timer_callback(void *pvParameter)
 extern void ss_initiator_task_function(void *pvParameter);
 extern void ss_responder_task_function(void *pvParameter);
 
+
 int main(void)
 {
+
     // === Khởi tạo LED ===
     LEDS_CONFIGURE(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
     LEDS_ON(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
@@ -104,13 +109,19 @@ int main(void)
     xTimerStart(led_timer_handle, 0);
 
     // === Cấu hình UART ===
-    boUART_Init();
+   // boUART_Init();
+
     printf("\r\n=== UWB Hybrid Localization System ===\r\n");
     printf("Node ID: %d ", NODE_ID);
+
 #if NODE_ID == 1
     printf("(TAG - Initiator)\r\n");
+
+#elif NODE_ID == 0
+    printf("(MASTER ANCHOR)\r\n");
+
 #else
-    printf("(ANCHOR %d)\r\n", NODE_ID - 2);
+    printf("(ANCHOR SLAVE %d)\r\n", NODE_ID - 2);
 #endif
 
     // === Cấu hình ngắt DW1000 ===
@@ -141,15 +152,21 @@ int main(void)
     }
 #else
 
-    // === Tạo task UWB phù hợp với NODE_ID ===
 #if NODE_ID == 1
-    // Tag: chạy initiator
-    xTaskCreate(ss_initiator_task_function, "UWB_INIT", configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
-    printf("Starting as TAG (Initiator)...\r\n");
+    // TAG
+    xTaskCreate(ss_initiator_task_function, "UWB_INIT",
+                configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
+
+#elif NODE_ID == 0
+    // MASTER
+    master_hybrid_init();   // quan trọng
+    xTaskCreate(ss_responder_task_function, "UWB_RESP",
+                configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
+
 #else
-    // Anchor: chạy responder
-    xTaskCreate(ss_responder_task_function, "UWB_RESP", configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
-    printf("Starting as ANCHOR (Responder)...\r\n");
+    // ANCHOR THƯỜNG
+    xTaskCreate(ss_responder_task_function, "UWB_RESP",
+                configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
 #endif
 
     // === Bắt đầu FreeRTOS ===

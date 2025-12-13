@@ -38,8 +38,12 @@
     <folder Name="::CMSIS" />
     <folder Name="::Device" />
     <folder Name="Application">
+      <file file_name="../ble_beacon.c" />
+      <file file_name="../ble_beacon.h" />
       <file file_name="../ble_hybrid.c" />
       <file file_name="../ble_hybrid.h" />
+      <file file_name="../ble_scanner.c" />
+      <file file_name="../ble_scanner.h" />
       <file file_name="../hybrid_scalable.c" />
       <file file_name="../hybrid_scalable.h" />
       <file file_name="../main.c" />
