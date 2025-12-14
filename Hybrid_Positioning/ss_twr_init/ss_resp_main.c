@@ -145,6 +145,23 @@ int ss_resp_run(void)
                 ts |= ((uint64)rx_buffer[TDOA_REP_MSG_TS_IDX + i]) << (8 * i);
 
             master_hybrid_handle_uwb_tdoa(src, cycle_id, ts);
+if (src != 0)
+{
+    uint8 ts_tab[5];
+    uint64 ref_ts = 0;
+
+    dwt_readsystime(ts_tab);   
+
+    for (int i = 4; i >= 0; i--)
+    {
+        ref_ts <<= 8;
+        ref_ts |= ts_tab[i];
+    }
+
+    master_hybrid_handle_uwb_tdoa(0, cycle_id, ref_ts);
+}
+
+
             return 1;
         }
 

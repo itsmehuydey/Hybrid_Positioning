@@ -151,11 +151,10 @@ int ss_init_run(int anchor_id)
             ble_pkt.anchor_id  = (uint8_t)anchor_id;
             ble_pkt.cycle_id   = g_cycle_id;
             ble_pkt.distance   = (float)distance;
-            for (int i = 0; i < 5; i++)
-{
+            //for (int i = 0; i < 5; i++)
+
             ble_raw_beacon_send_payload((uint8_t*)&ble_pkt, sizeof(mh_ble_tof_packet_t));
-    vTaskDelay(pdMS_TO_TICKS(20));   // 20 ms
-}
+ 
             printf("[TAG][BLE TX] TOF -> MASTER | cycle=%u anchor=%d dist=%.2f m\r\n",
        g_cycle_id, anchor_id, distance);
             reset_dw1000_state();

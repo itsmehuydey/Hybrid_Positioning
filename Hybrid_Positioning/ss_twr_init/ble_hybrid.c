@@ -18,7 +18,7 @@
 
 // Timeout cho 1 cycle (ms) – bạn có thể chỉnh tuỳ tốc độ hệ thống
 #ifndef MH_SLOT_TIMEOUT_MS
-#define MH_SLOT_TIMEOUT_MS   60u
+#define MH_SLOT_TIMEOUT_MS   1200u
 #endif
 
 // Hàm lấy thời gian hệ thống (ms)
@@ -120,18 +120,24 @@ static mh_cycle_slot_t* mh_find_or_alloc_slot(uint16_t cycle_id)
 // Đủ điều kiện để gửi HYBRID?
 static int mh_slot_ready_for_hybrid(const mh_cycle_slot_t *slot)
 {
-    // TOF: anchor 1 & 2
-    if (!(slot->have_tof[1] && slot->have_tof[0]))
-        return 0;
+    if (!slot->have_tdoa[0]) return 0;
 
-    // TDOA: anchor 2,3,4 (ref = anchor 1)
-    if (!(slot->have_tdoa[1] &&
-          slot->have_tdoa[2] &&
-          slot->have_tdoa[3]))
-        return 0;
+    int tof_cnt = 0;
+    int tdoa_cnt = 0;
 
-    return 1;   // ĐỦ ĐẦU VÀO HYBRID
+    for (int i = 0; i < MH_MAX_ANCHORS; i++)
+    {
+        if (slot->have_tof[i])  tof_cnt++;
+        if (slot->have_tdoa[i]) tdoa_cnt++;
+    }
+
+    if (tof_cnt < 2) return 0;
+
+    if (tdoa_cnt < 3) return 0;
+
+    return 1;
 }
+
 
 
 
@@ -278,12 +284,12 @@ void master_gateway_send(const uint8_t *data, uint16_t len)
            pkt->ref_idx,
            pkt->tdoa_mask,
            pkt->tof_mask);
-for (int i = 0; i < 5; i++)
-{
+//for (int i = 0; i < 5; i++)
+//{
     ble_raw_beacon_send_payload(
         (const uint8_t *)pkt,
         sizeof(mh_hybrid_packet_t)
     );
-    vTaskDelay(pdMS_TO_TICKS(20));   // 20 ms
-}
+    //vTaskDelay(pdMS_TO_TICKS(20));   // 20 ms
+//}
 }
