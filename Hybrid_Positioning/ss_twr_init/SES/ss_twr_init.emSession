@@ -73,20 +73,19 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="1" y="100" useTextEdit="1" path="../main.c" left="0" selected="1" top="96" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="18" y="13" useTextEdit="1" path="../ss_resp_main.c" left="0" top="6" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="22" y="218" useTextEdit="1" path="../hybrid_scalable.c" left="0" top="218" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="22" y="156" useTextEdit="1" path="../ss_init_main.c" left="0" top="144" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="100" useTextEdit="1" path="../main.c" left="0" selected="1" top="89" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="18" y="13" useTextEdit="1" path="../ss_resp_main.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="230" useTextEdit="1" path="../ss_init_main.c" left="0" top="211" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="21" y="43" useTextEdit="1" path="../config/sdk_config.h" left="0" top="32" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="209" useTextEdit="1" path="../simulation.c" left="0" top="181" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="209" useTextEdit="1" path="../simulation.c" left="0" top="193" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="22" y="218" useTextEdit="1" path="../hybrid_scalable.c" left="0" top="218" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="10" y="44" useTextEdit="1" path="../hybrid_scalable.h" left="0" top="39" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="29" y="292" useTextEdit="1" path="../ble_hybrid.c" left="0" top="246" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="34" y="79" useTextEdit="1" path="../ble_hybrid.h" left="0" top="61" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="19" y="3" useTextEdit="1" path="../ble_beacon.h" left="0" top="0" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="39" y="4" useTextEdit="1" path="../ble_beacon.c" left="0" top="12" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="154" useTextEdit="1" path="../ble_scanner.c" left="0" top="143" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="3" y="5" useTextEdit="1" path="../ble_scanner.h" left="0" top="0" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="2686" useTextEdit="1" path="../../../nRF5_SDK_14.2.0/external/freertos/source/tasks.c" left="0" top="2677" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="31" y="127" useTextEdit="1" path="../ble_hybrid.c" left="0" top="114" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="60" y="84" useTextEdit="1" path="../ble_hybrid.h" left="0" top="60" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="47" y="7" useTextEdit="1" path="../ble_beacon.h" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="39" y="17" useTextEdit="1" path="../ble_beacon.c" left="0" top="0" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="22" y="191" useTextEdit="1" path="../ble_scanner.c" left="0" top="175" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="3" y="7" useTextEdit="1" path="../ble_scanner.h" left="0" top="0" codecName="Default"/>
  </Files>
  <EMStudioWindow activeProject="ss_twr_init" fileDialogDefaultFilter="*.c" autoConnectTarget="J-Link" buildConfiguration="nrf52832_xxaa" sessionSettings="" debugSearchFileMap="" fileDialogInitialDirectory="" debugSearchPath="" autoConnectCapabilities="3711"/>
 </session>
