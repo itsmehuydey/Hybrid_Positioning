@@ -94,25 +94,7 @@ static void led_toggle_timer_callback(void *pvParameter)
 // Forward declarations
 extern void ss_initiator_task_function(void *pvParameter);
 extern void ss_responder_task_function(void *pvParameter);
-static void ble_scan_task(void *p)
-{
-    UNUSED_PARAMETER(p);
 
-    uint8_t buf[32];
-    uint16_t len;
-
-    printf("[MASTER] BLE scan task started\r\n");
-
-    while (1)
-    {
-        if (ble_scan_packet(buf, &len))
-        {
-            printf("[MASTER][BLE RX] len=%u\r\n", len);
-            master_hybrid_handle_ble_data(buf, len);
-        }
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
 
 
 int main(void)
@@ -181,12 +163,12 @@ int main(void)
     master_hybrid_reset();
     ble_raw_beacon_init(0);
     ble_scanner_init();
-
-    xTaskCreate(ble_scan_task, "BLE_SCAN",
-                configMINIMAL_STACK_SIZE + 300,
-                NULL, 2, NULL);
     xTaskCreate(ss_responder_task_function, "UWB_RESP",
                 configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
+    //xTaskCreate(ble_scan_task, "BLE_SCAN",
+    //            configMINIMAL_STACK_SIZE + 300,
+    //            NULL, 2, NULL);
+    
 
 #else
     // ANCHOR THƯỜNG

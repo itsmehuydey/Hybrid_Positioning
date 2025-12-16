@@ -11,7 +11,7 @@ static uint8_t g_dev_id = 0;
 static const uint8_t ble_freqs[3]  = { 2, 26, 80 };    // ch 37,38,39
 static const uint8_t ble_ch_idx[3] = { 37, 38, 39 };
 
-//Bật HFCLK (High Frequency Clock) cho NRF_RADIO
+//Bật HFCLK (High Frequency Clock) cho NRF_RADIOi
 static void hfclk_start_timeout(void)
 {
     NRF_CLOCK->EVENTS_HFCLKSTARTED = 0;

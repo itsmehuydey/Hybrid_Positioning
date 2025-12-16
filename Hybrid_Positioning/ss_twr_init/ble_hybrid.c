@@ -284,12 +284,12 @@ void master_gateway_send(const uint8_t *data, uint16_t len)
            pkt->ref_idx,
            pkt->tdoa_mask,
            pkt->tof_mask);
-//for (int i = 0; i < 5; i++)
-//{
+for (int i = 0; i < 5; i++)
+{
     ble_raw_beacon_send_payload(
         (const uint8_t *)pkt,
         sizeof(mh_hybrid_packet_t)
     );
-    //vTaskDelay(pdMS_TO_TICKS(20));   // 20 ms
-//}
+    vTaskDelay(pdMS_TO_TICKS(20));   // 20 ms
+}
 }
