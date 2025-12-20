@@ -228,7 +228,7 @@ void ss_initiator_task_function(void *pvParameter)
             if (ss_init_run(i)) {
                 success_count++;
             }
-            vTaskDelay(pdMS_TO_TICKS(100));
+            vTaskDelay(pdMS_TO_TICKS(1000));
         }
 
         printf(" Success: %d/%d anchors\n", success_count, MAX_ANCHORS);
