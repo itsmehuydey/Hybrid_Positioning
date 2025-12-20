@@ -15,8 +15,10 @@
 #endif
 #define MY_ANCHOR_ID  NODE_ID
 
-#define POLL_MSG_DEST_ID_IDX      10
+
 #define RNG_DELAY_MS              5
+#define BLINK_MSG_DEST_IDX        10
+
 
 // ===== MẪU POLL (GIỮ NGUYÊN) =====
 static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0xFF, 0, 0};
@@ -25,6 +27,7 @@ static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE
 // ===== BLINK (TDOA) – TAG broadcast =====
 #define BLINK_FUNC_CODE           0xE2
 #define BLINK_MSG_FUNC_IDX        9
+#define POLL_MSG_DEST_ID_IDX      10
 #define BLINK_MSG_CYCLE_LSB_IDX   11
 #define BLINK_MSG_CYCLE_MSB_IDX   12
 
@@ -257,14 +260,40 @@ int ss_resp_run(void)
 
         // ---------- CASE 1: BLINK (TDOA) ----------
         if (func_code == BLINK_FUNC_CODE)
-        {
-            uint16 cycle_id = ((uint16)rx_buffer[BLINK_MSG_CYCLE_MSB_IDX] << 8) |
-                              (uint16)rx_buffer[BLINK_MSG_CYCLE_LSB_IDX];
+{
 
-            uint64 blink_rx_ts = get_rx_timestamp_u64();
+printf("[A%d] BLINK RAW: ", MY_ANCHOR_ID);
+for (int i = 0; i < 20; i++)
+    printf("%02X ", rx_buffer[i]);
+printf("\r\n");
+printf("[A%d] BLINK bytes[9..14]: %02X %02X %02X %02X %02X %02X\r\n",
+       MY_ANCHOR_ID,
+       rx_buffer[9],
+       rx_buffer[10],
+       rx_buffer[11],
+       rx_buffer[12],
+       rx_buffer[13],
+       rx_buffer[14]);
+    // Frame phải đủ dài mới đọc cycle
+    if (frame_len <= BLINK_MSG_CYCLE_MSB_IDX) {
+        uwb_force_rx_on();
+        return 1;
+    }
 
-            printf("[A%d] BLINK: cycle=%u ts=%llu\r\n",
-                   MY_ANCHOR_ID, cycle_id, (unsigned long long)blink_rx_ts);
+    // Chỉ nhận BLINK broadcast (Tag gửi DEST = 0xFF)
+    if (rx_buffer[BLINK_MSG_DEST_IDX] != 0xFF) {
+        uwb_force_rx_on();
+        return 1;
+    }
+
+    uint16_t cycle_id =
+        ((uint16_t)rx_buffer[BLINK_MSG_CYCLE_MSB_IDX] << 8)|
+         (uint16_t)rx_buffer[BLINK_MSG_CYCLE_LSB_IDX] ;
+
+    uint64_t blink_rx_ts = get_rx_timestamp_u64();
+
+    printf("[A%d] BLINK: cycle=%u ts=%llu\r\n",
+           MY_ANCHOR_ID, cycle_id, (unsigned long long)blink_rx_ts);
 
             if (MY_ANCHOR_ID == 0)
             {
@@ -373,7 +402,7 @@ void ss_responder_task_function(void *pvParameter)
            MY_ANCHOR_ID, NODE_ID);
 
     dwt_setleds(DWT_LEDS_ENABLE);
-
+    dwt_enableframefilter(0); 
     if (MY_ANCHOR_ID == 0)
     {
         master_hybrid_init();
