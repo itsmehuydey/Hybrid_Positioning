@@ -7,6 +7,8 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "ble_hybrid.h"
+#include "ble_tdoa_report.h"
+#include "ble_beacon.h"
 #include "ble_scanner.h"
 
 #ifndef NODE_ID
@@ -25,14 +27,6 @@ static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE
 #define POLL_MSG_DEST_ID_IDX      10
 #define BLINK_MSG_CYCLE_LSB_IDX   11
 #define BLINK_MSG_CYCLE_MSB_IDX   12
-
-#define TDOA_REP_FUNC_CODE        0xE3
-#define TDOA_REP_MSG_FUNC_IDX     9
-#define TDOA_REP_MSG_DEST_IDX     10
-#define TDOA_REP_MSG_SRC_IDX      11
-#define TDOA_REP_MSG_CYCLE_LSB    12
-#define TDOA_REP_MSG_CYCLE_MSB    13
-#define TDOA_REP_MSG_TS_IDX       14
 
 #define ALL_MSG_COMMON_LEN        10
 #define ALL_MSG_SN_IDX            2
@@ -55,6 +49,22 @@ static uint64 resp_tx_ts;
 static uint64 get_rx_timestamp_u64(void);
 static void   resp_msg_set_ts(uint8 *ts_field, const uint64 ts);
 
+/* ------------------------------------------------------------------
+   [1] Trạng thái sync CCP của anchor này
+       Master gửi BLINK(k) rồi BLINK(k+1) – anchor ghi lại 2 ts
+   ------------------------------------------------------------------ */
+typedef struct {
+    uint16_t cycle_id;
+    uint64_t syn_k;       /* ts nhận BLINK(k)     */
+    uint64_t syn_k1;      /* ts nhận BLINK(k+1)   */
+    uint64_t T_i;         /* ts nhận packet tag   */
+    uint8_t  has_syn_k;
+    uint8_t  has_syn_k1;
+    uint8_t  has_Ti;
+} anchor_sync_state_t;
+
+static anchor_sync_state_t g_sync = {0};
+
 static inline void uwb_clear_rx_events(void)
 {
     dwt_write32bitreg(SYS_STATUS_ID,
@@ -67,107 +77,29 @@ static inline void uwb_force_rx_on(void)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-static void send_tdoa_report_to_master(uint16 cycle_id, uint64 ts)
+/* ------------------------------------------------------------------
+   [3] Gửi BLE report về Master
+       Chỉ gửi khi đã có đủ syn_k + syn_k1 + T_i
+   ------------------------------------------------------------------ */
+static void send_tdoa_report_ble(uint16_t cycle_id)
 {
-    static uint8 tx_tdoa_rep_msg[19] = {
-        0x41, 0x88, 0, 0xCA, 0xDE, 'W','A','V','E',
-        TDOA_REP_FUNC_CODE,
-        0x00,
-        0x00,
-        0x00, 0x00,
-        0,0,0,0,0
-    };
+    if (!g_sync.has_syn_k || !g_sync.has_syn_k1 || !g_sync.has_Ti) return;
 
-    tx_tdoa_rep_msg[ALL_MSG_SN_IDX]         = frame_seq_nb;
-    tx_tdoa_rep_msg[TDOA_REP_MSG_DEST_IDX]  = 0;
-    tx_tdoa_rep_msg[TDOA_REP_MSG_SRC_IDX]   = (uint8)MY_ANCHOR_ID;
+    ble_tdoa_report_t pkt;
+    pkt.msg_type  = 'S';
+    pkt.anchor_id = (uint8_t)MY_ANCHOR_ID;
+    pkt.cycle_id  = cycle_id;
+    pkt.syn_k     = g_sync.syn_k;
+    pkt.syn_k1    = g_sync.syn_k1;
+    pkt.T_i       = g_sync.T_i;
 
-    tx_tdoa_rep_msg[TDOA_REP_MSG_CYCLE_LSB] = (uint8)(cycle_id & 0xFF);
-    tx_tdoa_rep_msg[TDOA_REP_MSG_CYCLE_MSB] = (uint8)((cycle_id >> 8) & 0xFF);
+    ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
 
-    for (int i = 0; i < 5; i++)
-        tx_tdoa_rep_msg[TDOA_REP_MSG_TS_IDX + i] = (uint8)((ts >> (8 * i)) & 0xFF);
-
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-    dwt_writetxdata(sizeof(tx_tdoa_rep_msg), tx_tdoa_rep_msg, 0);
-    dwt_writetxfctrl(sizeof(tx_tdoa_rep_msg), 0, 1);
-
-    (void)dwt_starttx(DWT_START_TX_IMMEDIATE);
-    while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {}
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-    frame_seq_nb++;
-
-    uwb_force_rx_on();
-
-    printf("[A%d] SEND TDOA to Master | cycle=%u\r\n", MY_ANCHOR_ID, cycle_id);
-}
-
-static void master_listen_tdoa_rep_window(uint16 expect_cycle_id, uint32 window_ms)
-{
-    if (MY_ANCHOR_ID != 0) return;
-
-    TickType_t t0 = xTaskGetTickCount();
-    TickType_t w  = pdMS_TO_TICKS(window_ms);
-
-    dwt_setrxtimeout(9000);
-
-    while ((xTaskGetTickCount() - t0) < w)
-    {
-        uwb_force_rx_on();
-
-        uint32 st;
-        while (!((st = dwt_read32bitreg(SYS_STATUS_ID)) &
-                 (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-        {
-            vTaskDelay(1);
-            if ((xTaskGetTickCount() - t0) >= w) break;
-        }
-        if ((xTaskGetTickCount() - t0) >= w) break;
-
-        if (st & SYS_STATUS_RXFCG)
-        {
-            uint32 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-            if (frame_len <= RX_BUF_LEN)
-                dwt_readrxdata(rx_buffer, frame_len, 0);
-
-            uwb_clear_rx_events();
-
-            if (frame_len >= 19 &&
-                rx_buffer[TDOA_REP_MSG_FUNC_IDX] == TDOA_REP_FUNC_CODE &&
-                rx_buffer[TDOA_REP_MSG_DEST_IDX] == 0)
-            {
-                uint8  src = rx_buffer[TDOA_REP_MSG_SRC_IDX];
-                uint16 cycle_id = ((uint16)rx_buffer[TDOA_REP_MSG_CYCLE_MSB] << 8) |
-                                  (uint16)rx_buffer[TDOA_REP_MSG_CYCLE_LSB];
-
-                uint64 ts = 0;
-                for (int i = 0; i < 5; i++)
-                    ts |= ((uint64)rx_buffer[TDOA_REP_MSG_TS_IDX + i]) << (8 * i);
-
-                if (cycle_id != expect_cycle_id)
-                {
-                    printf("[MASTER] RX E3 cycle mismatch: got=%u expect=%u src=%u\r\n",
-                           cycle_id, expect_cycle_id, src);
-                }
-                else
-                {
-                    printf("[MASTER] RX TDOA from A%u | cycle=%u\r\n", src, cycle_id);
-                }
-
-                master_hybrid_handle_uwb_tdoa(src, cycle_id, ts);
-            }
-        }
-        else
-        {
-            uwb_clear_rx_events();
-            dwt_rxreset();
-        }
-    }
-
-    dwt_setrxtimeout(0);
-    uwb_force_rx_on();
+    printf("[A%d] BLE SEND 'S' | cycle=%u syn_k=%llu syn_k1=%llu Ti=%llu\r\n",
+           MY_ANCHOR_ID, cycle_id,
+           (unsigned long long)g_sync.syn_k,
+           (unsigned long long)g_sync.syn_k1,
+           (unsigned long long)g_sync.T_i);
 }
 
 int ss_resp_run(void)
@@ -206,43 +138,11 @@ int ss_resp_run(void)
 
         uint8 func_code = rx_buffer[BLINK_MSG_FUNC_IDX];
 
-        if (func_code == TDOA_REP_FUNC_CODE)
-        {
-            if (MY_ANCHOR_ID != 0)
-            {
-                uwb_force_rx_on();
-                return 1;
-            }
-
-            if (frame_len < 19)
-            {
-                printf("[MASTER] RX E3 len too short: %lu\r\n", frame_len);
-                uwb_force_rx_on();
-                return 1;
-            }
-
-            if (rx_buffer[TDOA_REP_MSG_DEST_IDX] != 0)
-            {
-                uwb_force_rx_on();
-                return 1;
-            }
-
-            uint8  src = rx_buffer[TDOA_REP_MSG_SRC_IDX];
-            uint16 cycle_id = ((uint16)rx_buffer[TDOA_REP_MSG_CYCLE_MSB] << 8) |
-                              (uint16)rx_buffer[TDOA_REP_MSG_CYCLE_LSB];
-
-            uint64 ts = 0;
-            for (int i = 0; i < 5; i++)
-                ts |= ((uint64)rx_buffer[TDOA_REP_MSG_TS_IDX + i]) << (8 * i);
-
-            printf("[MASTER] RX TDOA from A%u | cycle=%u\r\n", src, cycle_id);
-
-            master_hybrid_handle_uwb_tdoa(src, cycle_id, ts);
-
-            uwb_force_rx_on();
-            return 1;
-        }
-
+        /* --------------------------------------------------------------
+           [1] Nhận BLINK từ Master
+           Master gửi 2 BLINK liên tiếp với cùng cycle_id.
+           Lần đầu → ghi syn_k; lần hai → ghi syn_k1.
+           -------------------------------------------------------------- */
         if (func_code == BLINK_FUNC_CODE)
         {
             if (frame_len <= BLINK_MSG_CYCLE_MSB_IDX) {
@@ -256,29 +156,46 @@ int ss_resp_run(void)
             }
 
             uint16_t cycle_id =
-                ((uint16_t)rx_buffer[BLINK_MSG_CYCLE_MSB_IDX] << 8)|
-                 (uint16_t)rx_buffer[BLINK_MSG_CYCLE_LSB_IDX] ;
+                ((uint16_t)rx_buffer[BLINK_MSG_CYCLE_MSB_IDX] << 8) |
+                 (uint16_t)rx_buffer[BLINK_MSG_CYCLE_LSB_IDX];
 
             uint64_t blink_rx_ts = get_rx_timestamp_u64();
 
-            printf("[A%d] RX BLINK | cycle=%u\r\n",
-                   MY_ANCHOR_ID, cycle_id);
+            printf("[A%d] RX BLINK | cycle=%u\r\n", MY_ANCHOR_ID, cycle_id);
 
-            if (MY_ANCHOR_ID == 0)
+            /* Phân biệt BLINK(k) và BLINK(k+1) theo thứ tự nhận
+               trong cùng cycle_id                                       */
+            if (g_sync.cycle_id != cycle_id ||
+                (!g_sync.has_syn_k && !g_sync.has_syn_k1))
             {
-                master_hybrid_handle_uwb_tdoa(0, cycle_id, blink_rx_ts);
+                /* BLINK(k) – lần đầu của cycle mới */
+                memset(&g_sync, 0, sizeof(g_sync));
+                g_sync.cycle_id  = cycle_id;
+                g_sync.syn_k     = blink_rx_ts;
+                g_sync.has_syn_k = 1;
+                printf("[A%d] SYN_K saved | cycle=%u\r\n", MY_ANCHOR_ID, cycle_id);
+            }
+            else if (g_sync.has_syn_k && !g_sync.has_syn_k1)
+            {
+                /* BLINK(k+1) – lần thứ hai cùng cycle */
+                g_sync.syn_k1     = blink_rx_ts;
+                g_sync.has_syn_k1 = 1;
+                printf("[A%d] SYN_K1 saved | cycle=%u\r\n", MY_ANCHOR_ID, cycle_id);
 
-                master_listen_tdoa_rep_window(cycle_id, 25);
+                /* Nếu đã có T_i trước đó thì gửi ngay */
+                if (g_sync.has_Ti) {
+                    send_tdoa_report_ble(cycle_id);
+                }
             }
-            else
-            {
-                send_tdoa_report_to_master(cycle_id, blink_rx_ts);
-            }
+            /* else: BLINK dư, bỏ qua */
 
             uwb_force_rx_on();
             return 1;
         }
 
+        /* --------------------------------------------------------------
+           Nhận POLL từ TAG (Two-Way Ranging)
+           -------------------------------------------------------------- */
         uint8 dest_id = rx_buffer[POLL_MSG_DEST_ID_IDX];
 
         if (dest_id != (uint8)MY_ANCHOR_ID)
@@ -296,6 +213,22 @@ int ss_resp_run(void)
         {
             poll_rx_ts = get_rx_timestamp_u64();
 
+            /* [2] Lưu T_i – timestamp nhận packet tag */
+            if (g_sync.cycle_id != 0 && g_sync.has_syn_k)
+            {
+                g_sync.T_i    = poll_rx_ts;
+                g_sync.has_Ti = 1;
+                printf("[A%d] T_i saved | cycle=%u Ti=%llu\r\n",
+                       MY_ANCHOR_ID, g_sync.cycle_id,
+                       (unsigned long long)poll_rx_ts);
+
+                /* Nếu đã có cả syn_k + syn_k1 thì gửi BLE ngay */
+                if (g_sync.has_syn_k1) {
+                    send_tdoa_report_ble(g_sync.cycle_id);
+                }
+            }
+
+            /* Trả RESP để TWR vẫn hoạt động (TOF đo từ TAG) */
             uint32 resp_tx_time = (poll_rx_ts +
                     (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
 
@@ -369,14 +302,15 @@ void ss_responder_task_function(void *pvParameter)
            MY_ANCHOR_ID, NODE_ID);
 
     dwt_setleds(DWT_LEDS_ENABLE);
-    dwt_enableframefilter(0); 
+    dwt_enableframefilter(0);
+
     if (MY_ANCHOR_ID == 0)
     {
         master_hybrid_init();
         master_hybrid_reset();
     }
 
-    uint8_t ble_buf[32];
+    uint8_t ble_buf[64];
     uint16_t ble_len;
 
     uwb_force_rx_on();

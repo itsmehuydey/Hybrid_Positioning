@@ -83,4 +83,5 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/main.o: \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_beacon.h \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_scanner.h \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_hybrid.h \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_tdoa_report.h \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\simulation.c

@@ -143,6 +143,7 @@ int ss_init_run(int anchor_id)
 
             printf("[Tag->A%d]  Dist = %.2f m\r\n", anchor_id, distance);
 
+            /* Gửi TOF về Master qua BLE */
             mh_ble_tof_packet_t ble_pkt;
             memset(&ble_pkt, 0, sizeof(ble_pkt));
 
@@ -186,6 +187,9 @@ static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
     }
 }
 
+/* ------------------------------------------------------------------
+   Hàm gửi 1 BLINK broadcast (giữ nguyên)
+   ------------------------------------------------------------------ */
 static void send_blink_broadcast(uint16 cycle_id)
 {
     tx_blink_msg[ALL_MSG_SN_IDX]          = frame_seq_nb;
@@ -218,10 +222,19 @@ void ss_initiator_task_function(void *pvParameter)
     while (1)
     {
         g_cycle_id = (uint16)((g_cycle_id + 1) & 0xFFFF);
-        printf("[TAG] TX BLINK | cycle=%u\r\n", g_cycle_id);
-        send_blink_broadcast(g_cycle_id);
-        vTaskDelay(pdMS_TO_TICKS(10));
 
+        /* [1] Master CCP: gửi BLINK(k) rồi BLINK(k+1) cùng cycle_id
+               Anchor phân biệt theo thứ tự nhận.
+               Delay 50ms giữa 2 BLINK đủ để anchor lưu riêng 2 timestamp. */
+        printf("[TAG] TX BLINK(k)   | cycle=%u\r\n", g_cycle_id);
+        send_blink_broadcast(g_cycle_id);
+        vTaskDelay(pdMS_TO_TICKS(50));   /* khoảng cách giữa k và k+1 */
+
+        printf("[TAG] TX BLINK(k+1) | cycle=%u\r\n", g_cycle_id);
+        send_blink_broadcast(g_cycle_id);
+        vTaskDelay(pdMS_TO_TICKS(20));   /* chờ anchor xử lý xong */
+
+        /* [2] TAG phát tín hiệu poll đến từng anchor để đo TOF */
         int success_count = 0;
 
         for (int i = 1; i < MAX_ANCHORS; i++)
