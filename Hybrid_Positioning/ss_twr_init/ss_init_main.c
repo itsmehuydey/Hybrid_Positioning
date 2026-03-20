@@ -1,4 +1,3 @@
-// ============================ ss_init_main.c ============================
 #include <stdio.h>
 #include <string.h>
 #include "FreeRTOS.h"
@@ -9,15 +8,12 @@
 #include "ble_hybrid.h"
 #include "ble_beacon.h"
 
-#define APP_NAME "INIT v1.3"
 #define RNG_DELAY_MS 100
 #define POLL_MSG_DEST_ID_IDX  10
 
-// ===== GÓI POLL (TWR) GIỮ NGUYÊN =====
 static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0xFF, 0, 0};
 static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-// ===== GÓI BLINK (TDOA) – BROADCAST =====
 #define BLINK_FUNC_CODE           0xE2
 #define BLINK_MSG_FUNC_IDX        9
 #define BLINK_MSG_DEST_IDX        10
@@ -147,19 +143,19 @@ int ss_init_run(int anchor_id)
 
             printf("[Tag->A%d]  Dist = %.2f m\r\n", anchor_id, distance);
 
-mh_ble_tof_packet_t ble_pkt;
-memset(&ble_pkt, 0, sizeof(ble_pkt));
+            mh_ble_tof_packet_t ble_pkt;
+            memset(&ble_pkt, 0, sizeof(ble_pkt));
 
-ble_pkt.msg_type   = 'T';
-ble_pkt.anchor_id  = (uint8_t)anchor_id;
-ble_pkt.cycle_id   = g_cycle_id;
-ble_pkt.distance   = (float)distance;
+            ble_pkt.msg_type   = 'T';
+            ble_pkt.anchor_id  = (uint8_t)anchor_id;
+            ble_pkt.cycle_id   = g_cycle_id;
+            ble_pkt.distance   = (float)distance;
 
-ble_raw_beacon_send_payload((uint8_t *)&ble_pkt, sizeof(ble_pkt));
-vTaskDelay(pdMS_TO_TICKS(20));
+            ble_raw_beacon_send_payload((uint8_t *)&ble_pkt, sizeof(ble_pkt));
+            vTaskDelay(pdMS_TO_TICKS(20));
 
-printf("[TAG][BLE TX] TOF -> MASTER | cycle=%u anchor=%d dist=%.2f m\r\n",
-       g_cycle_id, anchor_id, distance);
+            printf("[TAG] Send TOF to Master | cycle=%u A%d dist=%.2f m\r\n",
+                   g_cycle_id, anchor_id, distance);
 
             reset_dw1000_state();
             return 1;
@@ -196,15 +192,8 @@ static void send_blink_broadcast(uint16 cycle_id)
     tx_blink_msg[BLINK_MSG_DEST_IDX]      = 0xFF;
     tx_blink_msg[BLINK_MSG_CYCLE_LSB_IDX] = (uint8)(cycle_id & 0xFF);
     tx_blink_msg[BLINK_MSG_CYCLE_MSB_IDX] = (uint8)((cycle_id >> 8) & 0xFF);
-printf("TAG BLINK cycle=%u | bytes[11]=0x%02X bytes[12]=0x%02X\r\n",
-        cycle_id,
-        tx_blink_msg[BLINK_MSG_CYCLE_LSB_IDX],
-        tx_blink_msg[BLINK_MSG_CYCLE_MSB_IDX]);
+
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-    printf("TAG BLINK RAW: ");
-for (int i = 0; i < 20; i++)
-    printf("%02X ", tx_blink_msg[i]);
-printf("\r\n");
 
     dwt_writetxdata(sizeof(tx_blink_msg), tx_blink_msg, 0);
     dwt_writetxfctrl(sizeof(tx_blink_msg), 0, 1);
@@ -229,6 +218,7 @@ void ss_initiator_task_function(void *pvParameter)
     while (1)
     {
         g_cycle_id = (uint16)((g_cycle_id + 1) & 0xFFFF);
+        printf("[TAG] TX BLINK | cycle=%u\r\n", g_cycle_id);
         send_blink_broadcast(g_cycle_id);
         vTaskDelay(pdMS_TO_TICKS(10));
 
@@ -242,7 +232,7 @@ void ss_initiator_task_function(void *pvParameter)
             vTaskDelay(pdMS_TO_TICKS(1000));
         }
 
-        printf(" Success: %d/%d anchors\n", success_count, MAX_ANCHORS);
+        printf(" Success: %d/%d anchors\n", success_count, MAX_ANCHORS - 1);
 
         int ok = 1;
         for (int i = 0; i < MAX_ANCHORS; i++)

@@ -1,4 +1,3 @@
-// ============================ ss_resp_main.c (FIXED - FULL) ============================
 #include "sdk_config.h"
 #include <stdio.h>
 #include <string.h>
@@ -11,34 +10,29 @@
 #include "ble_scanner.h"
 
 #ifndef NODE_ID
-#define NODE_ID 0  
+#define NODE_ID 0
 #endif
 #define MY_ANCHOR_ID  NODE_ID
-
 
 #define RNG_DELAY_MS              5
 #define BLINK_MSG_DEST_IDX        10
 
-
-// ===== MẪU POLL (GIỮ NGUYÊN) =====
 static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0xFF, 0, 0};
 static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 
-// ===== BLINK (TDOA) – TAG broadcast =====
 #define BLINK_FUNC_CODE           0xE2
 #define BLINK_MSG_FUNC_IDX        9
 #define POLL_MSG_DEST_ID_IDX      10
 #define BLINK_MSG_CYCLE_LSB_IDX   11
 #define BLINK_MSG_CYCLE_MSB_IDX   12
 
-// ===== TDOA REPORT (SLAVE -> MASTER) =====
 #define TDOA_REP_FUNC_CODE        0xE3
 #define TDOA_REP_MSG_FUNC_IDX     9
 #define TDOA_REP_MSG_DEST_IDX     10
 #define TDOA_REP_MSG_SRC_IDX      11
 #define TDOA_REP_MSG_CYCLE_LSB    12
 #define TDOA_REP_MSG_CYCLE_MSB    13
-#define TDOA_REP_MSG_TS_IDX       14   // 5 bytes: [14..18]
+#define TDOA_REP_MSG_TS_IDX       14
 
 #define ALL_MSG_COMMON_LEN        10
 #define ALL_MSG_SN_IDX            2
@@ -73,21 +67,19 @@ static inline void uwb_force_rx_on(void)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-// ===== SLAVE -> MASTER gửi timestamp (E3) =====
 static void send_tdoa_report_to_master(uint16 cycle_id, uint64 ts)
 {
-    // 10 common bytes + dest + src + cycle(2) + ts(5) = 19 bytes
     static uint8 tx_tdoa_rep_msg[19] = {
         0x41, 0x88, 0, 0xCA, 0xDE, 'W','A','V','E',
         TDOA_REP_FUNC_CODE,
-        0x00, // DEST (master=0)
-        0x00, // SRC
-        0x00, 0x00, // cycle lsb/msb
-        0,0,0,0,0   // ts[5]
+        0x00,
+        0x00,
+        0x00, 0x00,
+        0,0,0,0,0
     };
 
     tx_tdoa_rep_msg[ALL_MSG_SN_IDX]         = frame_seq_nb;
-    tx_tdoa_rep_msg[TDOA_REP_MSG_DEST_IDX]  = 0;                 // master = 0
+    tx_tdoa_rep_msg[TDOA_REP_MSG_DEST_IDX]  = 0;
     tx_tdoa_rep_msg[TDOA_REP_MSG_SRC_IDX]   = (uint8)MY_ANCHOR_ID;
 
     tx_tdoa_rep_msg[TDOA_REP_MSG_CYCLE_LSB] = (uint8)(cycle_id & 0xFF);
@@ -107,13 +99,11 @@ static void send_tdoa_report_to_master(uint16 cycle_id, uint64 ts)
 
     frame_seq_nb++;
 
-    // IMPORTANT: bật RX lại ngay sau TX
     uwb_force_rx_on();
 
-    printf("[A%d] SEND TDOA_REP | cycle=%u\r\n", MY_ANCHOR_ID, cycle_id);
+    printf("[A%d] SEND TDOA to Master | cycle=%u\r\n", MY_ANCHOR_ID, cycle_id);
 }
 
-// ===== Master listen window sau BLINK để gom E3 (tránh miss do scheduler) =====
 static void master_listen_tdoa_rep_window(uint16 expect_cycle_id, uint32 window_ms)
 {
     if (MY_ANCHOR_ID != 0) return;
@@ -121,7 +111,6 @@ static void master_listen_tdoa_rep_window(uint16 expect_cycle_id, uint32 window_
     TickType_t t0 = xTaskGetTickCount();
     TickType_t w  = pdMS_TO_TICKS(window_ms);
 
-    // window ngắn, set timeout nhỏ để không treo
     dwt_setrxtimeout(9000);
 
     while ((xTaskGetTickCount() - t0) < w)
@@ -157,7 +146,6 @@ static void master_listen_tdoa_rep_window(uint16 expect_cycle_id, uint32 window_
                 for (int i = 0; i < 5; i++)
                     ts |= ((uint64)rx_buffer[TDOA_REP_MSG_TS_IDX + i]) << (8 * i);
 
-                // không ép cycle phải trùng (để debug), nhưng vẫn log mismatch
                 if (cycle_id != expect_cycle_id)
                 {
                     printf("[MASTER] RX E3 cycle mismatch: got=%u expect=%u src=%u\r\n",
@@ -165,8 +153,7 @@ static void master_listen_tdoa_rep_window(uint16 expect_cycle_id, uint32 window_
                 }
                 else
                 {
-                    printf("[MASTER] RX TDOA_REP | cycle=%u src=%u ts=%llu\r\n",
-                           cycle_id, src, (unsigned long long)ts);
+                    printf("[MASTER] RX TDOA from A%u | cycle=%u\r\n", src, cycle_id);
                 }
 
                 master_hybrid_handle_uwb_tdoa(src, cycle_id, ts);
@@ -219,7 +206,6 @@ int ss_resp_run(void)
 
         uint8 func_code = rx_buffer[BLINK_MSG_FUNC_IDX];
 
-        // ---------- CASE 0: TDOA REPORT (SLAVE -> MASTER) ----------
         if (func_code == TDOA_REP_FUNC_CODE)
         {
             if (MY_ANCHOR_ID != 0)
@@ -249,8 +235,7 @@ int ss_resp_run(void)
             for (int i = 0; i < 5; i++)
                 ts |= ((uint64)rx_buffer[TDOA_REP_MSG_TS_IDX + i]) << (8 * i);
 
-            printf("[MASTER] RX TDOA_REP | len=%lu cycle=%u src=%u ts=%llu\r\n",
-                   frame_len, cycle_id, src, (unsigned long long)ts);
+            printf("[MASTER] RX TDOA from A%u | cycle=%u\r\n", src, cycle_id);
 
             master_hybrid_handle_uwb_tdoa(src, cycle_id, ts);
 
@@ -258,48 +243,31 @@ int ss_resp_run(void)
             return 1;
         }
 
-        // ---------- CASE 1: BLINK (TDOA) ----------
         if (func_code == BLINK_FUNC_CODE)
-{
+        {
+            if (frame_len <= BLINK_MSG_CYCLE_MSB_IDX) {
+                uwb_force_rx_on();
+                return 1;
+            }
 
-printf("[A%d] BLINK RAW: ", MY_ANCHOR_ID);
-for (int i = 0; i < 20; i++)
-    printf("%02X ", rx_buffer[i]);
-printf("\r\n");
-printf("[A%d] BLINK bytes[9..14]: %02X %02X %02X %02X %02X %02X\r\n",
-       MY_ANCHOR_ID,
-       rx_buffer[9],
-       rx_buffer[10],
-       rx_buffer[11],
-       rx_buffer[12],
-       rx_buffer[13],
-       rx_buffer[14]);
-    // Frame phải đủ dài mới đọc cycle
-    if (frame_len <= BLINK_MSG_CYCLE_MSB_IDX) {
-        uwb_force_rx_on();
-        return 1;
-    }
+            if (rx_buffer[BLINK_MSG_DEST_IDX] != 0xFF) {
+                uwb_force_rx_on();
+                return 1;
+            }
 
-    // Chỉ nhận BLINK broadcast (Tag gửi DEST = 0xFF)
-    if (rx_buffer[BLINK_MSG_DEST_IDX] != 0xFF) {
-        uwb_force_rx_on();
-        return 1;
-    }
+            uint16_t cycle_id =
+                ((uint16_t)rx_buffer[BLINK_MSG_CYCLE_MSB_IDX] << 8)|
+                 (uint16_t)rx_buffer[BLINK_MSG_CYCLE_LSB_IDX] ;
 
-    uint16_t cycle_id =
-        ((uint16_t)rx_buffer[BLINK_MSG_CYCLE_MSB_IDX] << 8)|
-         (uint16_t)rx_buffer[BLINK_MSG_CYCLE_LSB_IDX] ;
+            uint64_t blink_rx_ts = get_rx_timestamp_u64();
 
-    uint64_t blink_rx_ts = get_rx_timestamp_u64();
-
-    printf("[A%d] BLINK: cycle=%u ts=%llu\r\n",
-           MY_ANCHOR_ID, cycle_id, (unsigned long long)blink_rx_ts);
+            printf("[A%d] RX BLINK | cycle=%u\r\n",
+                   MY_ANCHOR_ID, cycle_id);
 
             if (MY_ANCHOR_ID == 0)
             {
                 master_hybrid_handle_uwb_tdoa(0, cycle_id, blink_rx_ts);
 
-                // nghe thêm để gom E3
                 master_listen_tdoa_rep_window(cycle_id, 25);
             }
             else
@@ -311,7 +279,6 @@ printf("[A%d] BLINK bytes[9..14]: %02X %02X %02X %02X %02X %02X\r\n",
             return 1;
         }
 
-        // ---------- CASE 2: POLL (TWR) – GIỮ NGUYÊN ----------
         uint8 dest_id = rx_buffer[POLL_MSG_DEST_ID_IDX];
 
         if (dest_id != (uint8)MY_ANCHOR_ID)
@@ -416,10 +383,8 @@ void ss_responder_task_function(void *pvParameter)
 
     while (1)
     {
-        // ===== 1) ƯU TIÊN UWB (timing-critical) =====
         ss_resp_run();
 
-        // ===== 2) BLE chỉ scan NGẮN khi rảnh =====
         if (MY_ANCHOR_ID == 0)
         {
             if (ble_scan_packet(ble_buf, &ble_len))
@@ -429,7 +394,6 @@ void ss_responder_task_function(void *pvParameter)
             }
         }
 
-        // yield rất nhẹ
         vTaskDelay(1);
     }
 }
