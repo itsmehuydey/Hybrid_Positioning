@@ -27,8 +27,6 @@ static uint8 tx_blink_msg[] = {0x41,0x88,0,0xCA,0xDE,'W','A','V','E',
 #define RESP_MSG_RESP_TX_TS_IDX 14
 #define RESP_MSG_TS_LEN         4
 
-/* Quan trọng: 2 biến này KHÔNG được reset bởi bất kỳ đoạn code nào
-   ngoài task init. TAG reset hardware sẽ tự reset chúng.           */
 static uint8  frame_seq_nb = 0;
 static uint16 g_cycle_id   = 0;
 
@@ -58,7 +56,6 @@ static void reset_dw1000_state(void)
     dwt_setrxtimeout(0);
 }
 
-/* TOF ranging – giữ nguyên */
 int ss_init_run(int anchor_id)
 {
     if (anchor_id < 0 || anchor_id >= MAX_ANCHORS) return 0;
@@ -76,7 +73,8 @@ int ss_init_run(int anchor_id)
     int ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
     if (ret != DWT_SUCCESS) { reset_dw1000_state(); return 0; }
 
-    dwt_setrxtimeout(2500);
+    /* Tăng Timeout ở TAG lên 8ms để kịp nhận được phản hồi từ Anchor */
+    dwt_setrxtimeout(8000); 
     uint32 wait_start = xTaskGetTickCount();
 
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
@@ -119,7 +117,6 @@ int ss_init_run(int anchor_id)
             meas[anchor_id].distance = distance;
             meas[anchor_id].valid    = 1;
 
-            /* Gửi TOF qua BLE – cycle_id = g_cycle_id hiện tại */
             mh_ble_tof_packet_t ble_pkt;
             memset(&ble_pkt, 0, sizeof(ble_pkt));
             ble_pkt.msg_type  = 'T';
@@ -188,16 +185,14 @@ void ss_initiator_task_function(void *pvParameter)
     {
         g_cycle_id = (uint16)((g_cycle_id + 1) & 0xFFFF);
 
-        /* [1] BLINK – dùng cùng g_cycle_id với TOF bên dưới */
         send_blink_broadcast(g_cycle_id);
         vTaskDelay(pdMS_TO_TICKS(30));
 
-        /* [2] TOF – dùng cùng g_cycle_id với BLINK ở trên */
         int ok = 0;
-        for (int i = 1; i < MAX_ANCHORS; i++)
+        for (int i = 0; i < MAX_ANCHORS; i++)
         {
             if (ss_init_run(i)) ok++;
-            vTaskDelay(pdMS_TO_TICKS(100)); /* 100ms thay vì 200ms */
+            vTaskDelay(pdMS_TO_TICKS(100)); 
         }
 
         printf("[TAG] cyc=%u ok=%d\r\n", g_cycle_id, ok);

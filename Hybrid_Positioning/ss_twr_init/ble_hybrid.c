@@ -14,8 +14,7 @@
 #define MH_SLOT_TIMEOUT_MS 5000u
 #endif
 
-/* Cửa sổ thời gian để ghép SYNC và TOF vào cùng slot
-   500ms tính theo ms hệ thống (FreeRTOS tick)               */
+/* Cửa sổ thời gian để ghép SYNC và TOF vào cùng slot */
 #define MH_MATCH_WINDOW_MS  500u
 
 static inline uint32_t system_time_ms(void)
@@ -25,8 +24,6 @@ static inline uint32_t system_time_ms(void)
 
 /* ====================================================================
    Slot lưu dữ liệu 1 cycle
-   Dùng cycle_id = cycle_k1 của anchor report.
-   TOF từ TAG cũng dùng g_cycle_id = cycle_k1.
    ==================================================================== */
 typedef struct {
     uint8_t  used;
@@ -35,7 +32,7 @@ typedef struct {
     uint8_t  have_sync[MH_MAX_ANCHORS];
     uint64_t syn_k[MH_MAX_ANCHORS];
     uint64_t syn_k1[MH_MAX_ANCHORS];
-    uint64_t T_i[MH_MAX_ANCHORS];     /* A0: = syn_k1; Slave: = poll rx ts */
+    uint64_t T_i[MH_MAX_ANCHORS];
 
     uint8_t  have_tof[MH_MAX_ANCHORS];
     float    dist[MH_MAX_ANCHORS];
@@ -86,7 +83,6 @@ static mh_cycle_slot_t* mh_find_or_alloc_slot(uint16_t cycle_id)
     return &g_cycle_buf[oldest];
 }
 
-/* [4] Ref = A0 ưu tiên */
 static int mh_select_ref(const mh_cycle_slot_t *slot)
 {
     if (slot->have_sync[0]) return 0;
@@ -95,7 +91,6 @@ static int mh_select_ref(const mh_cycle_slot_t *slot)
     return -1;
 }
 
-/* [5] Clock drift R_i,j */
 static double mh_calc_drift(const mh_cycle_slot_t *slot, int i, int ref)
 {
     double denom = (double)(int64_t)(slot->syn_k1[ref] - slot->syn_k[ref]);
@@ -103,7 +98,6 @@ static double mh_calc_drift(const mh_cycle_slot_t *slot, int i, int ref)
     return (double)(int64_t)(slot->syn_k1[i] - slot->syn_k[i]) / denom;
 }
 
-/* [6] Normalize: T_i' = (T_i - syn_k_i) / R_i */
 static double mh_normalize_ts(const mh_cycle_slot_t *slot, int i, int ref)
 {
     double R = (i == ref) ? 1.0 : mh_calc_drift(slot, i, ref);
@@ -111,7 +105,6 @@ static double mh_normalize_ts(const mh_cycle_slot_t *slot, int i, int ref)
     return (double)(int64_t)(slot->T_i[i] - slot->syn_k[i]) / R;
 }
 
-/* Điều kiện: A0 có sync + ít nhất 1 slave có sync + ít nhất 1 TOF */
 static int mh_slot_ready(const mh_cycle_slot_t *slot)
 {
     if (!slot->have_sync[0]) return 0;
@@ -157,7 +150,6 @@ static void mh_emit(const mh_cycle_slot_t *slot)
     printf("[MASTER] HYBRID cyc=%u ref=A%d TDOA=0x%02X TOF=0x%02X\r\n",
            slot->cycle_id, ref, tmask, dmask);
 
-    /* In delta_d để dễ kiểm tra */
     for (int i = 0; i < MH_MAX_ANCHORS; i++)
         if (tmask & (1u << i))
             printf("  A%d dd=%.2fm d=%.2fm\r\n",
@@ -179,7 +171,6 @@ static void mh_try_process(void)
     }
 }
 
-/* Nhận BLE 'S' – từ slave hoặc A0 self-feed */
 void master_hybrid_handle_ble_tdoa_report(const ble_tdoa_report_t *rpt)
 {
     if (!rpt || rpt->anchor_id >= MH_MAX_ANCHORS) return;
@@ -196,7 +187,6 @@ void master_hybrid_handle_ble_tdoa_report(const ble_tdoa_report_t *rpt)
     mh_try_process();
 }
 
-/* Nhận BLE data – route 'S' / 'T' */
 void master_hybrid_handle_ble_data(const uint8_t *data, uint16_t len)
 {
     if (!data || len == 0) return;

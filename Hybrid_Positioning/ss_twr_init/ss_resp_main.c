@@ -39,7 +39,7 @@ static uint8  rx_buffer[RX_BUF_LEN];
 static uint32 status_reg = 0;
 
 #define UUS_TO_DWT_TIME            65536
-#define POLL_RX_TO_RESP_TX_DLY_UUS 2500
+#define POLL_RX_TO_RESP_TX_DLY_UUS 8000 
 
 static uint64 poll_rx_ts;
 static uint64 resp_tx_ts;
@@ -47,22 +47,7 @@ static uint64 resp_tx_ts;
 static uint64 get_rx_timestamp_u64(void);
 static void   resp_msg_set_ts(uint8 *ts_field, const uint64 ts);
 
-/* ====================================================================
-   SYNC STATE – sliding window, 2 BLINK liên tiếp bất kể cycle_id
-   ====================================================================
-   - cycle_k  / syn_k  : BLINK đầu
-   - cycle_k1 / syn_k1 : BLINK kế tiếp (cycle_id khác cycle_k)
-   - T_i               : POLL nhận được (CHỈ dùng cho slave, A0 không cần)
-
-   A0 (master/ref):
-     - Dùng syn_k1 làm T_ref (không cần POLL)
-     - Self-feed ngay sau khi có syn_k + syn_k1
-     - cycle_id = cycle_k1
-
-   Slave:
-     - Cần đủ syn_k + syn_k1 + T_i
-     - Gửi BLE 'S', cycle_id = cycle_k1
-   ==================================================================== */
+/* Cấu trúc lưu trạng thái Đồng bộ của Node */
 typedef struct {
     uint16_t cycle_k;
     uint64_t syn_k;
@@ -82,12 +67,11 @@ static anchor_sync_state_t g_sync = {0};
 
 #define SYNC_TIMEOUT_TICKS pdMS_TO_TICKS(5000)
 
-/* ====================================================================
-   BLE TX QUEUE (chỉ dùng cho slave)
-   ==================================================================== */
 static ble_tdoa_report_t g_ble_pending_pkt;
 static volatile uint8_t  g_ble_pending    = 0;
 static volatile uint8_t  g_ble_send_count = 0;
+static uint32_t ble_send_start_tick       = 0; /* Biến quản lý trễ chống đụng luồng */
+
 #define BLE_SEND_REPEAT      6
 #define BLE_SEND_INTERVAL_MS 10
 
@@ -103,43 +87,44 @@ static inline void uwb_force_rx_on(void)
     dwt_rxenable(DWT_START_RX_IMMEDIATE);
 }
 
-/* ====================================================================
-   Commit sync report
-   A0: self-feed trực tiếp dùng syn_k1 làm T_i (không cần POLL)
-   Slave: queue BLE
-   ==================================================================== */
+/* Hàm chốt báo cáo đồng bộ và đưa vào hàng đợi BLE */
 static void commit_sync_report(void)
 {
+    /* [1] Phải có đủ Syn_k và Syn_k1 */
     if (!g_sync.has_syn_k || !g_sync.has_syn_k1) return;
 
-    /* Slave cần thêm T_i */
+    /* [2] Nếu là Slave, phải đo được T_i từ gói POLL */
     if (MY_ANCHOR_ID != 0 && !g_sync.has_Ti) return;
 
+    /* [3] Chuẩn bị gói tin báo cáo về Master */
     ble_tdoa_report_t rpt;
     rpt.msg_type  = 'S';
     rpt.anchor_id = (uint8_t)MY_ANCHOR_ID;
-    rpt.cycle_id  = g_sync.cycle_k1;
+    rpt.cycle_id  = g_sync.cycle_k; 
     rpt.syn_k     = g_sync.syn_k;
     rpt.syn_k1    = g_sync.syn_k1;
-    /* A0: T_i = syn_k1 (thời điểm nhận BLINK cuối = ref baseline)
-       Slave: T_i = timestamp nhận POLL                              */
     rpt.T_i       = (MY_ANCHOR_ID == 0) ? g_sync.syn_k1 : g_sync.T_i;
 
     if (MY_ANCHOR_ID == 0)
     {
+        /* Master tự nhận báo cáo của chính nó, không cần BLE */
         master_hybrid_handle_ble_tdoa_report(&rpt);
-        printf("[A0] SYNC ck=%u ck1=%u\r\n", g_sync.cycle_k, g_sync.cycle_k1);
+        printf("[A0] SYNC cyc=%u k1=%u\r\n", g_sync.cycle_k, g_sync.cycle_k1);
     }
     else
     {
+        /* Tránh đụng luồng: Phân bổ khe thời gian gửi BLE theo Anchor ID 
+           Ví dụ: A1 đợi 60ms, A2 đợi 120ms, A3 đợi 180ms */
         g_ble_pending_pkt = rpt;
         g_ble_send_count  = 0;
         g_ble_pending     = 1;
-        printf("[A%d] SYNC queued ck=%u ck1=%u\r\n",
-               MY_ANCHOR_ID, g_sync.cycle_k, g_sync.cycle_k1);
+        ble_send_start_tick = xTaskGetTickCount() + pdMS_TO_TICKS(MY_ANCHOR_ID * 60);
+        
+        printf("[A%d] SYNC queued cyc=%u, T_i=%llu (delay %dms)\r\n", 
+               MY_ANCHOR_ID, g_sync.cycle_k, g_sync.T_i, MY_ANCHOR_ID * 60);
     }
 
-    /* Slide: syn_k1 → syn_k mới */
+    /* Trượt cửa sổ thời gian: k1 hiện tại trở thành k cho chu kỳ sau */
     g_sync.cycle_k      = g_sync.cycle_k1;
     g_sync.syn_k        = g_sync.syn_k1;
     g_sync.has_syn_k    = 1;
@@ -148,32 +133,37 @@ static void commit_sync_report(void)
     g_sync.created_tick = xTaskGetTickCount();
 }
 
+static uint32_t last_ble_send_tick = 0;
+
 static void flush_ble_pending(void)
 {
     if (!g_ble_pending) return;
-    if (g_ble_send_count >= BLE_SEND_REPEAT) { g_ble_pending = 0; return; }
+    
+    uint32_t now = xTaskGetTickCount();
+    
+    /* Kiểm tra xem đã đến "khe thời gian" của Node này chưa */
+    if (now < ble_send_start_tick) return;
+    
+    /* Gửi lặp lại định kỳ */
+    if ((now - last_ble_send_tick) < pdMS_TO_TICKS(BLE_SEND_INTERVAL_MS)) return;
+    last_ble_send_tick = now;
 
     ble_raw_beacon_send_payload(
         (uint8_t *)&g_ble_pending_pkt, sizeof(ble_tdoa_report_t));
     g_ble_send_count++;
 
     if (g_ble_send_count == 1)
-        printf("[A%d] BLE S ck1=%u\r\n",
-               MY_ANCHOR_ID, g_ble_pending_pkt.cycle_id);
+        printf("[A%d] BLE S sent cyc=%u\r\n", MY_ANCHOR_ID, g_ble_pending_pkt.cycle_id);
 
     if (g_ble_send_count >= BLE_SEND_REPEAT) g_ble_pending = 0;
 }
 
-/* ====================================================================
-   UWB RX
-   ==================================================================== */
 int ss_resp_run(void)
 {
-    uwb_force_rx_on();
-
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-             (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-        vTaskDelay(1);
+    status_reg = dwt_read32bitreg(SYS_STATUS_ID);
+    if (!(status_reg & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {
+        return 0; 
+    }
 
     uint32 frame_len = 0;
     int    rx_ok     = 0;
@@ -194,11 +184,10 @@ int ss_resp_run(void)
 
     uint8 func_code = rx_buffer[BLINK_MSG_FUNC_IDX];
 
-    /* ── BLINK ──────────────────────────────────────────────────────── */
+    /* ── NHẬN GÓI BLINK TỪ TAG ──────────────────────────────────────── */
     if (func_code == BLINK_FUNC_CODE)
     {
-        if (frame_len <= BLINK_MSG_CYCLE_MSB_IDX ||
-            rx_buffer[BLINK_MSG_DEST_IDX] != 0xFF)
+        if (frame_len < 13 || rx_buffer[BLINK_MSG_DEST_IDX] != 0xFF)
         { uwb_force_rx_on(); return 1; }
 
         uint16_t cycle_id =
@@ -207,7 +196,6 @@ int ss_resp_run(void)
 
         uint64_t ts = get_rx_timestamp_u64();
 
-        /* Timeout reset */
         if (g_sync.has_syn_k &&
             (xTaskGetTickCount() - g_sync.created_tick) > SYNC_TIMEOUT_TICKS)
         {
@@ -217,36 +205,29 @@ int ss_resp_run(void)
 
         if (!g_sync.has_syn_k)
         {
-            /* (a) syn_k */
             g_sync.cycle_k      = cycle_id;
             g_sync.syn_k        = ts;
             g_sync.has_syn_k    = 1;
             g_sync.has_syn_k1   = 0;
             g_sync.has_Ti       = 0;
             g_sync.created_tick = xTaskGetTickCount();
-            printf("[A%d] SYN_K ck=%u\r\n", MY_ANCHOR_ID, cycle_id);
+            printf("[A%d] SYN_K cyc=%u\r\n", MY_ANCHOR_ID, cycle_id);
         }
         else if (cycle_id == g_sync.cycle_k)
         {
-            /* (b) duplicate – bỏ qua */
+            /* Trùng chu kỳ, bỏ qua */
         }
         else if (!g_sync.has_syn_k1)
         {
-            /* (c) syn_k1 */
             g_sync.cycle_k1   = cycle_id;
             g_sync.syn_k1     = ts;
             g_sync.has_syn_k1 = 1;
-            printf("[A%d] SYN_K1 ck=%u ck1=%u\r\n",
-                   MY_ANCHOR_ID, g_sync.cycle_k, cycle_id);
 
-            /* A0 commit ngay (không cần T_i) */
             if (MY_ANCHOR_ID == 0) commit_sync_report();
-            /* Slave commit nếu đã có T_i */
             else if (g_sync.has_Ti) commit_sync_report();
         }
         else
         {
-            /* (d) cả 2 đã có – BLINK mới = slide */
             if (MY_ANCHOR_ID != 0 && g_sync.has_Ti) commit_sync_report();
 
             g_sync.cycle_k      = cycle_id;
@@ -255,14 +236,14 @@ int ss_resp_run(void)
             g_sync.has_syn_k1   = 0;
             g_sync.has_Ti       = 0;
             g_sync.created_tick = xTaskGetTickCount();
-            printf("[A%d] SYN_K ck=%u\r\n", MY_ANCHOR_ID, cycle_id);
+            printf("[A%d] SYN_K cyc=%u\r\n", MY_ANCHOR_ID, cycle_id);
         }
 
         uwb_force_rx_on();
         return 1;
     }
 
-    /* ── POLL ───────────────────────────────────────────────────────── */
+    /* ── NHẬN GÓI POLL TỪ TAG ───────────────────────────────────────── */
     {
         uint8 dest_id = rx_buffer[POLL_MSG_DEST_ID_IDX];
         if (dest_id != (uint8)MY_ANCHOR_ID) { uwb_force_rx_on(); return 1; }
@@ -277,18 +258,16 @@ int ss_resp_run(void)
 
         poll_rx_ts = get_rx_timestamp_u64();
 
-        /* Slave: lưu T_i */
+        /* Lưu lại sự kiện T_i khi nhận được tín hiệu POLL từ Tag */
         if (MY_ANCHOR_ID != 0 && g_sync.has_syn_k)
         {
             g_sync.T_i    = poll_rx_ts;
             g_sync.has_Ti = 1;
-            printf("[A%d] Ti ck=%u ck1=%u k1=%d\r\n",
-                   MY_ANCHOR_ID, g_sync.cycle_k,
-                   g_sync.cycle_k1, g_sync.has_syn_k1);
+            
+            /* Phòng trường hợp T_i đến trễ hơn cả Syn_k1 */
             if (g_sync.has_syn_k1) commit_sync_report();
         }
 
-        /* Trả RESP */
         uint32 resp_tx_time =
             (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
         dwt_setdelayedtrxtime(resp_tx_time);
@@ -302,7 +281,6 @@ int ss_resp_run(void)
         dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
 
         if (dwt_starttx(DWT_START_TX_DELAYED) == DWT_SUCCESS) {
-            /* Fix busy-wait: nhường CPU cho Softdevice */
             uint32_t t0 = xTaskGetTickCount();
             while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {
                 if ((xTaskGetTickCount() - t0) > pdMS_TO_TICKS(5)) break;
@@ -355,14 +333,12 @@ void ss_responder_task_function(void *pvParameter)
     {
         ss_resp_run();
 
-        if (g_ble_pending) {
-            flush_ble_pending();
-            vTaskDelay(pdMS_TO_TICKS(BLE_SEND_INTERVAL_MS));
-        }
+        flush_ble_pending();
 
         if (MY_ANCHOR_ID == 0) {
-            if (ble_scan_packet(ble_buf, &ble_len))
+            if (ble_scan_packet(ble_buf, &ble_len)) {
                 master_hybrid_handle_ble_data(ble_buf, ble_len);
+            }
         }
 
         vTaskDelay(1);
