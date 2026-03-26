@@ -5,196 +5,72 @@
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
-#include "ble_hybrid.h"
 #include "ble_beacon.h"
 
-#define POLL_MSG_DEST_ID_IDX  10
-
-static uint8 tx_poll_msg[] = {0x41,0x88,0,0xCA,0xDE,'W','A','V','E',0xE0,0xFF,0,0};
-static uint8 rx_resp_msg[] = {0x41,0x88,0,0xCA,0xDE,'V','E','W','A',0xE1,0,0,0,0,0,0,0,0,0,0};
-
-#define BLINK_FUNC_CODE         0xE2
-#define BLINK_MSG_DEST_IDX      10
-#define BLINK_MSG_CYCLE_LSB_IDX 11
-#define BLINK_MSG_CYCLE_MSB_IDX 12
-
-static uint8 tx_blink_msg[] = {0x41,0x88,0,0xCA,0xDE,'W','A','V','E',
-                               BLINK_FUNC_CODE,0xFF,0,0};
-
-#define ALL_MSG_COMMON_LEN      10
-#define ALL_MSG_SN_IDX          2
-#define RESP_MSG_POLL_RX_TS_IDX 10
-#define RESP_MSG_RESP_TX_TS_IDX 14
-#define RESP_MSG_TS_LEN         4
-
-static uint8  frame_seq_nb = 0;
-static uint16 g_cycle_id   = 0;
-
-#define RX_BUF_LEN 20
-static uint8  rx_buffer[RX_BUF_LEN];
-static uint32 status_reg = 0;
-
-#define UUS_TO_DWT_TIME 65536
-#define SPEED_OF_LIGHT  299702547
-
-static double tof;
-static double distance;
-
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts);
-static void send_blink_broadcast(uint16 cycle_id);
-
 #define MAX_ANCHORS 4
+#define SPEED_OF_LIGHT 299702547
 
-typedef struct { double toa; double distance; int valid; } AnchorMeas;
-static AnchorMeas meas[MAX_ANCHORS];
+static uint8 tx_poll_msg[] = {0x41,0x88,0,0xCA,0xDE,'W','A','V','E',0xE0,0,0,0};
+static uint8 rx_buffer[24];
+static uint16 g_cycle_id = 0;
 
-static void reset_dw1000_state(void)
-{
-    dwt_write32bitreg(SYS_STATUS_ID,
-        SYS_STATUS_ALL_TX | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-    dwt_rxreset();
+// Hàm quan trọng: Xóa sạch trạng thái cũ để đo Anchor mới
+void reset_uwb_state(void) {
     dwt_setrxtimeout(0);
+    dwt_rxreset();
+    dwt_write32bitreg(SYS_STATUS_ID, 0xFFFFFFFF); // Clear all flags
 }
 
-int ss_init_run(int anchor_id)
-{
-    if (anchor_id < 0 || anchor_id >= MAX_ANCHORS) return 0;
+void ss_initiator_task_function(void *pvParameter) {
+    //ble_raw_beacon_init(TAG_ID);
+    printf("[TAG] STARTING SEQUENTIAL TOF\r\n");
 
-    reset_dw1000_state();
-    vTaskDelay(5);
+    while (1) {
+        g_cycle_id++;
+        for (int a = 0; a < MAX_ANCHORS; a++) {
+            
+            reset_uwb_state(); // Reset trước khi đổi ID
+            vTaskDelay(2);     // Nghỉ ngắn để chip ổn định
 
-    tx_poll_msg[ALL_MSG_SN_IDX]       = frame_seq_nb;
-    tx_poll_msg[POLL_MSG_DEST_ID_IDX] = (uint8)anchor_id;
+            tx_poll_msg[10] = (uint8)a; // Gán ID Anchor (0, 1, 2, 3)
+            tx_poll_msg[2]++;           // Tăng Sequence Number
 
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-    dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
-    dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);
+            dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
+            dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);
+            
+            // Gửi POLL và chờ phản hồi ngay lập tức
+            if (dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED) == DWT_SUCCESS) {
+                dwt_setrxtimeout(5000); // 5ms là đủ cho phản hồi TOF
 
-    int ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-    if (ret != DWT_SUCCESS) { reset_dw1000_state(); return 0; }
+                // Chờ sự kiện
+                while (!((dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
-    /* Tăng Timeout ở TAG lên 8ms để kịp nhận được phản hồi từ Anchor */
-    dwt_setrxtimeout(8000); 
-    uint32 wait_start = xTaskGetTickCount();
+                if (dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_RXFCG) {
+                    dwt_readrxdata(rx_buffer, 24, 0);
+                    if (rx_buffer[9] == 0xE1) {
+                        uint32 t_round_t = dwt_readtxtimestamplo32();
+                        uint32 t_round_r = dwt_readrxtimestamplo32();
+                        uint32 t_reply_r = *(uint32*)&rx_buffer[10];
+                        uint32 t_reply_t = *(uint32*)&rx_buffer[14];
 
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-             (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-    {
-        if ((xTaskGetTickCount() - wait_start) > pdMS_TO_TICKS(50)) {
-            reset_dw1000_state(); return 0;
+                        int32 rtd_init = (int32)(t_round_r - t_round_t);
+                        int32 rtd_resp = (int32)(t_reply_t - t_reply_r);
+
+                        float clockOffsetRatio = dwt_readcarrierintegrator() * (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6);
+                        double tof = ((double)rtd_init - (double)rtd_resp * (1.0f - clockOffsetRatio)) / 2.0;
+                        float dist = (float)(tof * DWT_TIME_UNITS * SPEED_OF_LIGHT);
+
+                        if (dist > 0 && dist < 150) {
+                            // Gửi BLE
+                            //mh_ble_tof_packet_t ble_pkt = {'T', (uint8_t)a, g_cycle_id, dist};
+                            //ble_raw_beacon_send_payload((uint8_t *)&ble_pkt, sizeof(ble_pkt));
+                            printf("[TOF] A%d: %.2fm\r\n", a, dist);
+                        }
+                    }
+                }
+            }
+            // Khe hở thời gian để Anchor tiếp theo không bị nhiễu bởi gói tin cũ
+            vTaskDelay(pdMS_TO_TICKS(1000)); 
         }
-        vTaskDelay(1);
-    }
-
-    frame_seq_nb++;
-
-    if (status_reg & SYS_STATUS_RXFCG)
-    {
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
-        int frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-        if (frame_len > RX_BUF_LEN) { reset_dw1000_state(); return 0; }
-        dwt_readrxdata(rx_buffer, frame_len, 0);
-        rx_buffer[ALL_MSG_SN_IDX] = 0;
-
-        if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
-        {
-            uint32 poll_tx_ts = dwt_readtxtimestamplo32();
-            uint32 resp_rx_ts = dwt_readrxtimestamplo32();
-            uint32 poll_rx_ts_v, resp_tx_ts_v;
-            resp_msg_get_ts(&rx_buffer[RESP_MSG_POLL_RX_TS_IDX], &poll_rx_ts_v);
-            resp_msg_get_ts(&rx_buffer[RESP_MSG_RESP_TX_TS_IDX], &resp_tx_ts_v);
-
-            float clockOffsetRatio = dwt_readcarrierintegrator() *
-                (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6);
-            int32 rtd_init = resp_rx_ts   - poll_tx_ts;
-            int32 rtd_resp = resp_tx_ts_v - poll_rx_ts_v;
-
-            tof      = ((rtd_init - rtd_resp * (1.0f - clockOffsetRatio)) / 2.0f)
-                       * DWT_TIME_UNITS;
-            distance = tof * SPEED_OF_LIGHT;
-
-            meas[anchor_id].toa      = tof;
-            meas[anchor_id].distance = distance;
-            meas[anchor_id].valid    = 1;
-
-            mh_ble_tof_packet_t ble_pkt;
-            memset(&ble_pkt, 0, sizeof(ble_pkt));
-            ble_pkt.msg_type  = 'T';
-            ble_pkt.anchor_id = (uint8_t)anchor_id;
-            ble_pkt.cycle_id  = g_cycle_id;
-            ble_pkt.distance  = (float)distance;
-
-            ble_raw_beacon_send_payload((uint8_t *)&ble_pkt, sizeof(ble_pkt));
-            vTaskDelay(pdMS_TO_TICKS(20));
-
-            printf("[TOF] cyc=%u A%d d=%.2fm\r\n", g_cycle_id, anchor_id, distance);
-
-            reset_dw1000_state();
-            return 1;
-        }
-    }
-    else
-    {
-        dwt_write32bitreg(SYS_STATUS_ID,
-                          SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-        dwt_rxreset();
-    }
-
-    meas[anchor_id].valid = 0;
-    reset_dw1000_state();
-    return 0;
-}
-
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
-{
-    *ts = 0;
-    for (int i = 0; i < RESP_MSG_TS_LEN; i++)
-        *ts += (uint32)ts_field[i] << (i * 8);
-}
-
-static void send_blink_broadcast(uint16 cycle_id)
-{
-    tx_blink_msg[ALL_MSG_SN_IDX]          = frame_seq_nb;
-    tx_blink_msg[BLINK_MSG_DEST_IDX]      = 0xFF;
-    tx_blink_msg[BLINK_MSG_CYCLE_LSB_IDX] = (uint8)(cycle_id & 0xFF);
-    tx_blink_msg[BLINK_MSG_CYCLE_MSB_IDX] = (uint8)((cycle_id >> 8) & 0xFF);
-
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-    dwt_writetxdata(sizeof(tx_blink_msg), tx_blink_msg, 0);
-    dwt_writetxfctrl(sizeof(tx_blink_msg), 0, 1);
-
-    dwt_starttx(DWT_START_TX_IMMEDIATE);
-    while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {}
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-    frame_seq_nb++;
-}
-
-void ss_initiator_task_function(void *pvParameter)
-{
-    UNUSED_PARAMETER(pvParameter);
-    dwt_setleds(DWT_LEDS_ENABLE);
-
-    ble_raw_beacon_init(TAG_ID);
-    g_cycle_id   = 0;
-    frame_seq_nb = 0;
-
-    printf("[TAG] START TAG_ID=%d\r\n", TAG_ID);
-
-    while (1)
-    {
-        g_cycle_id = (uint16)((g_cycle_id + 1) & 0xFFFF);
-
-        send_blink_broadcast(g_cycle_id);
-        vTaskDelay(pdMS_TO_TICKS(30));
-
-        int ok = 0;
-        for (int i = 0; i < MAX_ANCHORS; i++)
-        {
-            if (ss_init_run(i)) ok++;
-            vTaskDelay(pdMS_TO_TICKS(100)); 
-        }
-
-        printf("[TAG] cyc=%u ok=%d\r\n", g_cycle_id, ok);
     }
 }
