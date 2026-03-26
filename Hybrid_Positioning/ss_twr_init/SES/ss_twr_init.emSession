@@ -73,10 +73,10 @@
   <Watches active="0" update="Never"/>
  </Watch4>
  <Files>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="100" useTextEdit="1" path="../main.c" left="0" selected="1" top="92" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="15" useTextEdit="1" path="../ss_resp_main.c" left="0" top="0" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="189" useTextEdit="1" path="../ss_init_main.c" left="0" top="182" codecName="Default"/>
-  <SessionOpenFile windowGroup="DockEditLeft" x="21" y="209" useTextEdit="1" path="../ble_hybrid.c" left="0" top="204" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="100" useTextEdit="1" path="../main.c" left="0" selected="1" top="89" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="0" y="16" useTextEdit="1" path="../ss_resp_main.c" left="0" top="3" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="9" y="198" useTextEdit="1" path="../ss_init_main.c" left="0" top="193" codecName="Default"/>
+  <SessionOpenFile windowGroup="DockEditLeft" x="23" y="3" useTextEdit="1" path="../ble_hybrid.c" left="0" top="0" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="21" y="43" useTextEdit="1" path="../config/sdk_config.h" left="0" top="32" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="0" y="209" useTextEdit="1" path="../simulation.c" left="0" top="193" codecName="Default"/>
   <SessionOpenFile windowGroup="DockEditLeft" x="22" y="218" useTextEdit="1" path="../hybrid_scalable.c" left="0" top="218" codecName="Default"/>

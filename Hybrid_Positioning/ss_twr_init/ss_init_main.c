@@ -37,6 +37,10 @@ static uint32 status_reg = 0;
 #define UUS_TO_DWT_TIME 65536
 #define SPEED_OF_LIGHT  299702547
 
+#define MAX_PROPAGATION_DELAY_UUS  100
+#define ANCHOR_RX_MARGIN_UUS       2000
+#define TAG_RX_TIMEOUT_UUS         (8000 + MAX_PROPAGATION_DELAY_UUS + ANCHOR_RX_MARGIN_UUS)
+
 static double tof;
 static double distance;
 
@@ -73,8 +77,7 @@ int ss_init_run(int anchor_id)
     int ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
     if (ret != DWT_SUCCESS) { reset_dw1000_state(); return 0; }
 
-    /* Tăng Timeout ở TAG lên 8ms để kịp nhận được phản hồi từ Anchor */
-    dwt_setrxtimeout(8000); 
+    dwt_setrxtimeout(TAG_RX_TIMEOUT_UUS); 
     uint32 wait_start = xTaskGetTickCount();
 
     while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
