@@ -6,6 +6,7 @@
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
+#include "ble_beacon.h" // Kéo thư viện BLE vào
 
 // Thay đổi NODE_ID (0, 1, 2, 3) tương ứng với từng mạch Anchor khi nạp code
 #ifndef NODE_ID
@@ -24,18 +25,19 @@
     float my_pos_x = 5.0f, my_pos_y = 5.0f;
 #endif
 
-/* Chiều dài mảng 26 byte chứa thêm 8 byte (X và Y) */
-static uint8 tx_resp_msg[26] = {
+/* Chiều dài mảng 27 byte chứa X, Y (byte 18-25) và Anchor ID (byte 26) */
+static uint8 tx_resp_msg[27] = {
     0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, // 0-9: Header
     0, 0, 0, 0, // 10-13: TS1 (Poll RX)
     0, 0, 0, 0, // 14-17: TS2 (Resp TX)
     0, 0, 0, 0, // 18-21: Tọa độ X
-    0, 0, 0, 0  // 22-25: Tọa độ Y
+    0, 0, 0, 0, // 22-25: Tọa độ Y
+    0           // 26: Anchor ID
 };
 
 #define POLL_RX_TO_RESP_TX_DLY_UUS 1500 
 #define UUS_TO_DWT_TIME            65536
-#define TX_ANT_DLY                 16436 // Thay đổi theo anten thực tế nếu cần
+#define TX_ANT_DLY                 16436 
 
 static uint8 rx_buffer[64];
 
@@ -51,17 +53,24 @@ static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts) {
 }
 
 void ss_responder_task_function(void *pvParameter) {
+    // Khởi tạo BLE cho Anchor
+    ble_raw_beacon_init(MY_ANCHOR_ID);
     printf("[A%d] READY. POS: (%.2f, %.2f)\r\n", MY_ANCHOR_ID, my_pos_x, my_pos_y);
     
-    // Nhúng sẵn tọa độ X, Y vào mảng gửi để không phải tính lại trong vòng lặp
+    // Nhúng sẵn tọa độ X, Y và ID vào mảng gửi qua UWB
     memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
     memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
+    tx_resp_msg[26] = (uint8)MY_ANCHOR_ID;
+
+    TickType_t last_ble_tx = 0;
 
     while (1) {
+        // Đặt timeout 65000 symbols (~65ms) để vòng lặp không bị kẹt chết ở UWB RX
+        dwt_setrxtimeout(65000);
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-        // Chờ nhận được khung hoặc lỗi
+        // Chờ nhận được khung UWB hoặc hết thời gian timeout (65ms)
         while (!(dwt_read32bitreg(SYS_STATUS_ID) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
         uint32 status = dwt_read32bitreg(SYS_STATUS_ID);
@@ -71,7 +80,6 @@ void ss_responder_task_function(void *pvParameter) {
                 dwt_readrxdata(rx_buffer, frame_len, 0);
             }
 
-            // Kiểm tra Function Code 0xE0 và xem Tag có gọi đúng ID của mình không
             if (rx_buffer[9] == 0xE0 && rx_buffer[10] == (uint8)MY_ANCHOR_ID) {
                 uint64 poll_rx_ts = get_rx_timestamp_u64();
                 uint32 resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
@@ -95,6 +103,34 @@ void ss_responder_task_function(void *pvParameter) {
         } else {
             dwt_rxreset();
         }
-        vTaskDelay(1);
+
+        // ==========================================
+        // GỬI BLE ĐỊNH KỲ (MỖI 1 GIÂY)
+        // ==========================================
+        TickType_t now = xTaskGetTickCount();
+        if (now - last_ble_tx > pdMS_TO_TICKS(2000)) {
+            // In ra UART dạng JSON
+            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", 
+                   MY_ANCHOR_ID, my_pos_x, my_pos_y);
+
+            // Đóng gói nhị phân siêu nhỏ (10 byte) để qua BLE
+            #pragma pack(push, 1)
+            typedef struct {
+                uint8_t start_byte; 
+                uint8_t id;
+                float x;
+                float y;
+            } ble_anchor_packed_t;
+            #pragma pack(pop)
+
+            ble_anchor_packed_t pkt;
+            pkt.start_byte = '[';  // Mã ASCII '[' để nhận diện là Anchor
+            pkt.id = MY_ANCHOR_ID;
+            pkt.x = my_pos_x;
+            pkt.y = my_pos_y;
+
+            ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+            last_ble_tx = now;
+        }
     }
 }

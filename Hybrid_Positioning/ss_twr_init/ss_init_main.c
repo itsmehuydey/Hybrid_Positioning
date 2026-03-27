@@ -18,19 +18,20 @@
 #define FREQ_OFFSET_MULTIPLIER          (998.4e6 / 2.0 / 1024.0 / 131072.0)
 #define HERTZ_TO_PPM_MULTIPLIER_CHAN_5  (-1.0e6 / 6489.6e6)
 
+// --- ID CỦA TAG HIỆN TẠI ---
+#define TAG_ID 1
+
 // --- TỌA ĐỘ ANCHOR CỐ ĐỊNH ---
-// Ví dụ khoảng cách thực tế trên bàn
 static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f}; 
 static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 0.8f};
 
 // --- CẤU HÌNH TỰ ĐỘNG CALIBRATE NGẦM ---
-#define CALIB_SAMPLES 20                  // Lấy 20 mẫu để tính trung bình
-#define CALIB_TRUE_DISTANCE 1.0f          // Cần đặt Tag cách các Anchor 1 mét lúc vừa bật nguồn
+#define CALIB_SAMPLES 20                  
+#define CALIB_TRUE_DISTANCE 1.0f          
 
-// Các biến lưu trạng thái calibrate ngầm
 static int calib_count[MAX_ANCHORS] = {0};
 static float calib_sum[MAX_ANCHORS] = {0};
-static float anchor_offset[MAX_ANCHORS] = {0}; // Ban đầu offset = 0
+static float anchor_offset[MAX_ANCHORS] = {0}; 
 static bool is_calibrated[MAX_ANCHORS] = {false};
 // ---------------------------------------
 
@@ -39,15 +40,6 @@ static uint8 rx_buffer[32];
 static uint16 g_cycle_id = 0;
 
 static vec2 g_tag_pos_est = {0.0, 0.0};
-
-typedef struct __attribute__((packed)) {
-    uint8_t  msg_type;   
-    uint8_t  anchor_id;  
-    uint16_t cycle_id;   
-    float    distance;   
-    float    tag_x;      
-    float    tag_y;      
-} ble_pos_report_t;
 
 typedef struct {
     float x;
@@ -94,7 +86,7 @@ bool calculate_tag_position(float *out_x, float *out_y) {
 }
 
 void ss_initiator_task_function(void *pvParameter) {
-    ble_raw_beacon_init(1);
+    ble_raw_beacon_init(TAG_ID);
     printf("[TAG] SYSTEM STARTING - BACKGROUND CALIBRATION ENABLED\r\n");
     printf("[INFO] Place Tag %.2fm from Anchors for the first %d samples.\r\n\n", CALIB_TRUE_DISTANCE, CALIB_SAMPLES);
 
@@ -106,6 +98,9 @@ void ss_initiator_task_function(void *pvParameter) {
     while (1) {
         g_cycle_id++;
         
+        // ==========================================
+        // 1. QUÁ TRÌNH UWB ĐO KHOẢNG CÁCH
+        // ==========================================
         for (int a = 0; a < MAX_ANCHORS; a++) {
             reset_uwb_state(); 
             vTaskDelay(pdMS_TO_TICKS(5)); 
@@ -139,57 +134,69 @@ void ss_initiator_task_function(void *pvParameter) {
 
                         if (raw_dist > 0.05f && raw_dist < 100.0f) {
                             
-                            // --- THU THẬP MẪU CALIBRATE NGẦM ---
                             if (!is_calibrated[a]) {
                                 calib_sum[a] += raw_dist;
                                 calib_count[a]++;
                                 
-                                // Nếu đủ mẫu, tự động chốt Offset
                                 if (calib_count[a] == CALIB_SAMPLES) {
                                     float avg_dist = calib_sum[a] / CALIB_SAMPLES;
                                     anchor_offset[a] = avg_dist - CALIB_TRUE_DISTANCE;
                                     is_calibrated[a] = true;
-                                    
-                                    printf("\r\n[>>>] A%d AUTO-CALIBRATED! Avg: %.2fm | Offset applied: %.2fm\r\n\r\n", a, avg_dist, anchor_offset[a]);
                                 }
                             }
 
-                            // --- ÁP DỤNG OFFSET ---
-                            // Trước khi calib xong, anchor_offset = 0.0 nên dist = raw_dist (chưa bù trừ).
-                            // Sau khi calib xong, nó tự động trừ đi giá trị đã chốt.
                             float dist = raw_dist - anchor_offset[a];
                             if (dist <= 0.0f) dist = 0.01f;
 
                             anchors_info[a].x = HARDCODED_ANCHOR_X[a];
                             anchors_info[a].y = HARDCODED_ANCHOR_Y[a];
-                            
                             anchors_info[a].dist = dist;
                             anchors_info[a].last_update_tick = xTaskGetTickCount();
                             anchors_info[a].is_valid = true;
-                            
-                            // In ra để dễ quan sát: Nếu có dấu * là đã calibrate
-                            printf("[TOF] A%d: %.2fm %s\r\n", a, dist, is_calibrated[a] ? "(*)" : "");
                         }
                     }
                 }
             }
         } 
 
-        // Luôn luôn chạy định vị, không cần quan tâm đã calib xong hay chưa
+        // ==========================================
+        // 2. TÍNH TỌA ĐỘ VÀ ĐÓNG GÓI GỬI BLE
+        // ==========================================
         float tag_x = 0.0f, tag_y = 0.0f;
         
         if (calculate_tag_position(&tag_x, &tag_y)) {
-            printf(">>> TAG: %.2f %.2f\r\n", tag_x, tag_y);
+            // Lấy khoảng cách của 3 anchor đầu tiên (nếu có)
+            float d0 = anchors_info[0].is_valid ? anchors_info[0].dist : 0.0f;
+            float d1 = anchors_info[1].is_valid ? anchors_info[1].dist : 0.0f;
+            float d2 = anchors_info[2].is_valid ? anchors_info[2].dist : 0.0f;
 
-            ble_pos_report_t ble_pkt;
-            ble_pkt.msg_type  = 'T';
-            ble_pkt.anchor_id = 0xFF; 
-            ble_pkt.cycle_id  = g_cycle_id;
-            ble_pkt.distance  = 0;
-            ble_pkt.tag_x     = tag_x;
-            ble_pkt.tag_y     = tag_y;
+            // In JSON ra màn hình Serial (UART) để bạn theo dõi trực tiếp qua cáp
+            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f]}\r\n", 
+                   TAG_ID, tag_x, tag_y, d0, d1, d2);
 
-            ble_raw_beacon_send_payload((uint8_t *)&ble_pkt, sizeof(ble_pkt));
+            // Cấu trúc ép sát bộ nhớ (Packed Struct) để gửi BLE siêu nhẹ (Chỉ 22 Bytes)
+            #pragma pack(push, 1)
+            typedef struct {
+                uint8_t start_byte; 
+                uint8_t id;
+                float x;
+                float y;
+                float d[3];
+            } ble_packed_data_t;
+            #pragma pack(pop)
+
+            ble_packed_data_t pkt;
+            pkt.start_byte = '{';  // Ký hiệu nhận diện cho code Python
+            pkt.id = TAG_ID;
+            pkt.x = tag_x;
+            pkt.y = tag_y;
+            pkt.d[0] = d0; 
+            pkt.d[1] = d1; 
+            pkt.d[2] = d2;
+
+            // Truyền 22 bytes này qua BLE
+            ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+
         } else {
             printf("[!] Waiting for valid TOF data...\r\n");
         }
