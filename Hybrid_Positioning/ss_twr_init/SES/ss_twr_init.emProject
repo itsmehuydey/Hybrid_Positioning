@@ -45,13 +45,13 @@
       <file file_name="../ble_scanner.c" />
       <file file_name="../ble_scanner.h" />
       <file file_name="../ble_tdoa_report.h" />
-      <file file_name="../hybrid_scalable.c" />
-      <file file_name="../hybrid_scalable.h" />
       <file file_name="../main.c" />
       <file file_name="../config/sdk_config.h" />
       <file file_name="../simulation.c" />
       <file file_name="../ss_init_main.c" />
       <file file_name="../ss_resp_main.c" />
+      <file file_name="../utils.c" />
+      <file file_name="../utils.h" />
     </folder>
     <folder Name="Board Definition">
       <file file_name="../../../nRF5_SDK_14.2.0/components/boards/boards.c" />

@@ -23,7 +23,7 @@
 #include "deca_regs.h"
 #include "deca_device_api.h"
 #include "uart.h"
-#include "hybrid_scalable.h"
+#include "utils.h"
 #include "ble_beacon.h"
 #include "ble_scanner.h"
 #include "ble_hybrid.h"
@@ -38,14 +38,14 @@
 
 // Tọa độ các anchor (chỉ dùng cho Tag)
 #if NODE_ID == 1
-vec3 anc[N_ANCHORS] = {
-    {0.0, 0.0, 2.5},  
-    {2.0, 0.0, 2.5},
-    {2.0, 1.0, 2.5},
-    {0.0, 1.0, 2.5}
-};
+//vec3 anc[N_ANCHORS] = {
+//    {0.0, 0.0, 2.5},  
+//    {2.0, 0.0, 2.5},
+//    {2.0, 1.0, 2.5},
+//    {0.0, 1.0, 2.5}
+//};
 
-vec3 pos_est = {0, 0, 1.0}; 
+//vec3 pos_est = {0, 0, 1.0}; 
 #endif
 
 // Cấu hình DW1000

@@ -1,11 +1,14 @@
 Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ss_init_main.c \
+ ../config/sdk_config.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdio.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL_ConfDefaults.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL_Conf.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL_Arm_Conf.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/string.h \
+ C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/math.h \
+ C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL_FP.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/FreeRTOS.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stddef.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdint.h \
@@ -14,8 +17,6 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
  ../../../nRF5_SDK_14.2.0/components/device/compiler_abstraction.h \
  ../../../nRF5_SDK_14.2.0/components/device/nrf.h \
  ../../../nRF5_SDK_14.2.0/components/device/nrf52.h \
- C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/math.h \
- C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL_FP.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdlib.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/time.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/sys/time.h \
@@ -34,7 +35,6 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdbool.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/sdk_errors.h \
  ../../../nRF5_SDK_14.2.0/components/drivers_nrf/nrf_soc_nosd/nrf_error.h \
- ../config/sdk_config.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/nordic_common.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/app_error_weak.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/nrf_assert.h \
@@ -71,4 +71,5 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
  ../../../nRF5_SDK_14.2.0/components/boards/boards.h \
  ../../../boards/dw1001_dev.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/app_error.h \
- D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_beacon.h
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_beacon.h \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\utils.h

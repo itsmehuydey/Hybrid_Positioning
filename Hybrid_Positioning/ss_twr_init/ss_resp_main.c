@@ -7,16 +7,35 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 
+// Thay đổi NODE_ID (0, 1, 2, 3) tương ứng với từng mạch Anchor khi nạp code
 #ifndef NODE_ID
-#define NODE_ID 3
+#define NODE_ID 2
 #endif
 #define MY_ANCHOR_ID NODE_ID
 
-static uint8 tx_resp_msg[] = {0x41,0x88,0,0xCA,0xDE,'V','E','W','A',0xE1,0,0,0,0,0,0,0,0,0,0};
+// Cấu hình tọa độ (mét) tương ứng với từng Anchor ID
+#if MY_ANCHOR_ID == 0
+    float my_pos_x = 0.0f, my_pos_y = 0.0f;
+#elif MY_ANCHOR_ID == 1
+    float my_pos_x = 5.0f, my_pos_y = 0.0f;
+#elif MY_ANCHOR_ID == 2
+    float my_pos_x = 0.0f, my_pos_y = 5.0f;
+#else
+    float my_pos_x = 5.0f, my_pos_y = 5.0f;
+#endif
 
-// Giảm delay xuống 1.5ms để Tag không phải đợi lâu
+/* Chiều dài mảng 26 byte chứa thêm 8 byte (X và Y) */
+static uint8 tx_resp_msg[26] = {
+    0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, // 0-9: Header
+    0, 0, 0, 0, // 10-13: TS1 (Poll RX)
+    0, 0, 0, 0, // 14-17: TS2 (Resp TX)
+    0, 0, 0, 0, // 18-21: Tọa độ X
+    0, 0, 0, 0  // 22-25: Tọa độ Y
+};
+
 #define POLL_RX_TO_RESP_TX_DLY_UUS 1500 
 #define UUS_TO_DWT_TIME            65536
+#define TX_ANT_DLY                 16436 // Thay đổi theo anten thực tế nếu cần
 
 static uint8 rx_buffer[64];
 
@@ -32,22 +51,27 @@ static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts) {
 }
 
 void ss_responder_task_function(void *pvParameter) {
-    printf("[A%d] READY FOR TOF\r\n", MY_ANCHOR_ID);
+    printf("[A%d] READY. POS: (%.2f, %.2f)\r\n", MY_ANCHOR_ID, my_pos_x, my_pos_y);
     
+    // Nhúng sẵn tọa độ X, Y vào mảng gửi để không phải tính lại trong vòng lặp
+    memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
+    memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
+
     while (1) {
-        // Luôn dọn sạch sự kiện cũ trước khi bật RX
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-        // Chờ sự kiện (Có gói tin hoặc Lỗi/Timeout)
+        // Chờ nhận được khung hoặc lỗi
         while (!(dwt_read32bitreg(SYS_STATUS_ID) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
         uint32 status = dwt_read32bitreg(SYS_STATUS_ID);
         if (status & SYS_STATUS_RXFCG) {
             uint32 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-            dwt_readrxdata(rx_buffer, frame_len, 0);
+            if (frame_len <= sizeof(rx_buffer)) {
+                dwt_readrxdata(rx_buffer, frame_len, 0);
+            }
 
-            // Kiểm tra Function Code (0xE0) và Destination ID
+            // Kiểm tra Function Code 0xE0 và xem Tag có gọi đúng ID của mình không
             if (rx_buffer[9] == 0xE0 && rx_buffer[10] == (uint8)MY_ANCHOR_ID) {
                 uint64 poll_rx_ts = get_rx_timestamp_u64();
                 uint32 resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
@@ -66,11 +90,11 @@ void ss_responder_task_function(void *pvParameter) {
                     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
                 }
             } else {
-                // Nếu không phải gói cho mình, reset ngay để nhận gói tiếp theo
                 dwt_rxreset();
             }
+        } else {
+            dwt_rxreset();
         }
-        // Tránh chiếm dụng CPU quá mức
         vTaskDelay(1);
     }
 }
