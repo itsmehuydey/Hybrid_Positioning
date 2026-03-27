@@ -23,10 +23,10 @@
 
 // --- TỌA ĐỘ ANCHOR CỐ ĐỊNH ---
 static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f}; 
-static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 0.8f};
+static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f};
 
-// --- CẤU HÌNH TỰ ĐỘNG CALIBRATE NGẦM ---
-#define CALIB_SAMPLES 20                  
+
+#define CALIB_SAMPLES 10                  
 #define CALIB_TRUE_DISTANCE 1.0f          
 
 static int calib_count[MAX_ANCHORS] = {0};
@@ -208,6 +208,6 @@ void ss_initiator_task_function(void *pvParameter) {
             printf("[!] Waiting for valid TOF data...\r\n");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(100)); 
+        vTaskDelay(pdMS_TO_TICKS(1000)); 
     }
 }

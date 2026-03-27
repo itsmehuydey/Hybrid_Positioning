@@ -31,7 +31,7 @@
 #include "simulation.c"
 
 #ifndef NODE_ID
-#define NODE_ID 2
+#define NODE_ID 1
 #warning "NODE_ID not defined, defaulting to 1 (Tag)"
 #endif
 

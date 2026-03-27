@@ -18,11 +18,11 @@
 #if MY_ANCHOR_ID == 0
     float my_pos_x = 0.0f, my_pos_y = 0.0f;
 #elif MY_ANCHOR_ID == 1
-    float my_pos_x = 5.0f, my_pos_y = 0.0f;
+    float my_pos_x = 1.0f, my_pos_y = 0.0f;
 #elif MY_ANCHOR_ID == 2
-    float my_pos_x = 0.0f, my_pos_y = 5.0f;
+    float my_pos_x = 0.0f, my_pos_y = 1.0f;
 #else
-    float my_pos_x = 5.0f, my_pos_y = 5.0f;
+    float my_pos_x = 1.0f, my_pos_y = 1.0f;
 #endif
 
 /* Chiều dài mảng 27 byte chứa X, Y (byte 18-25) và Anchor ID (byte 26) */
