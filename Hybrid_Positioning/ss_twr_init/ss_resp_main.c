@@ -14,25 +14,47 @@
 #endif
 #define MY_ANCHOR_ID NODE_ID
 
-// Cấu hình tọa độ (mét) tương ứng với từng Anchor ID
+// =======================================================
+// TỌA ĐỘ ANCHOR (đơn vị: mét, gốc tọa độ tại Anchor 0)
+// Khi nạp firmware cho mỗi mạch Anchor, thay NODE_ID
+// đúng với vị trí vật lý rồi đo thực tế để điền số này.
+//
+// Ví dụ bố trí phòng 5m x 5m:
+//   A0 (0,0)  ─────  A1 (5,0)
+//     │                  │
+//   A2 (0,5)  ─────  A3 (5,5)
+//
+// QUAN TRỌNG: Tag sẽ ĐỌC tọa độ này từ gói phản hồi UWB
+// (byte 18-25), nên KHÔNG cần sửa ở phía Tag.
+// =======================================================
 #if MY_ANCHOR_ID == 0
-    float my_pos_x = 0.0f, my_pos_y = 0.0f;
+    float my_pos_x = 0.0f, my_pos_y = 0.0f;  // Góc dưới-trái
 #elif MY_ANCHOR_ID == 1
-    float my_pos_x = 5.0f, my_pos_y = 0.0f;
+    float my_pos_x = 5.0f, my_pos_y = 0.0f;  // Góc dưới-phải
 #elif MY_ANCHOR_ID == 2
-    float my_pos_x = 0.0f, my_pos_y = 5.0f;
+    float my_pos_x = 0.0f, my_pos_y = 5.0f;  // Góc trên-trái
 #else
-    float my_pos_x = 5.0f, my_pos_y = 5.0f;
+    float my_pos_x = 5.0f, my_pos_y = 5.0f;  // Góc trên-phải (A3)
 #endif
 
-/* Chiều dài mảng 27 byte chứa X, Y (byte 18-25) và Anchor ID (byte 26) */
+// -------------------------------------------------------
+// Format gói phản hồi UWB (27 byte), Tag đọc để biết:
+//   - Timestamp Poll RX (T1): byte 10-13 → tính TOF
+//   - Timestamp Resp TX (T2): byte 14-17 → tính TOF
+//   - Tọa độ X của Anchor   : byte 18-21 (float, LE)
+//   - Tọa độ Y của Anchor   : byte 22-25 (float, LE)
+//   - Anchor ID             : byte 26
+//
+// Nhờ đó Tag tự biết tọa độ từng Anchor mà KHÔNG cần
+// hardcode ở phía Tag → tránh mâu thuẫn cấu hình.
+// -------------------------------------------------------
 static uint8 tx_resp_msg[27] = {
-    0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, // 0-9: Header
-    0, 0, 0, 0, // 10-13: TS1 (Poll RX)
-    0, 0, 0, 0, // 14-17: TS2 (Resp TX)
-    0, 0, 0, 0, // 18-21: Tọa độ X
-    0, 0, 0, 0, // 22-25: Tọa độ Y
-    0           // 26: Anchor ID
+    0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, // [ 0- 9] Header
+    0, 0, 0, 0,                                            // [10-13] TS1: Poll RX timestamp
+    0, 0, 0, 0,                                            // [14-17] TS2: Resp TX timestamp
+    0, 0, 0, 0,                                            // [18-21] Anchor pos X (float)
+    0, 0, 0, 0,                                            // [22-25] Anchor pos Y (float)
+    0                                                       // [26]    Anchor ID
 };
 
 #define POLL_RX_TO_RESP_TX_DLY_UUS 1500 
