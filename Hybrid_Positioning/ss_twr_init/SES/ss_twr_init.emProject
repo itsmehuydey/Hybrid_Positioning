@@ -38,6 +38,8 @@
     <folder Name="::CMSIS" />
     <folder Name="::Device" />
     <folder Name="Application">
+      <file file_name="../anchor_calib.c" />
+      <file file_name="../anchor_calib.h" />
       <file file_name="../ble_beacon.c" />
       <file file_name="../ble_beacon.h" />
       <file file_name="../ble_hybrid.c" />

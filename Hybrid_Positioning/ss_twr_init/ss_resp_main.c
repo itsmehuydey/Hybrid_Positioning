@@ -6,110 +6,132 @@
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
-#include "ble_beacon.h" // Kéo thư viện BLE vào
+#include "ble_beacon.h"
+#include "anchor_calib.h"   /* anchor_self_calibrate() */
 
-// Thay đổi NODE_ID (0, 1, 2, 3) tương ứng với từng mạch Anchor khi nạp code
+/* ---------------------------------------------------------------
+   NODE_ID convention (xem anchor_calib.h để hiểu đầy đủ):
+     NODE_ID = 1       → Tag
+     NODE_ID = 2       → Anchor gốc (Reference), tự động = (0,0)
+     NODE_ID = 3,4,5…  → Anchor slave, tự tính tọa độ khi boot
+   --------------------------------------------------------------- */
 #ifndef NODE_ID
-#define NODE_ID 2
+#define NODE_ID 2   /* Mặc định: anchor gốc */
 #endif
 #define MY_ANCHOR_ID NODE_ID
 
-// =======================================================
-// TỌA ĐỘ ANCHOR (đơn vị: mét, gốc tọa độ tại Anchor 0)
-// Khi nạp firmware cho mỗi mạch Anchor, thay NODE_ID
-// đúng với vị trí vật lý rồi đo thực tế để điền số này.
-//
-// Ví dụ bố trí phòng 5m x 5m:
-//   A0 (0,0)  ─────  A1 (5,0)
-//     │                  │
-//   A2 (0,5)  ─────  A3 (5,5)
-//
-// QUAN TRỌNG: Tag sẽ ĐỌC tọa độ này từ gói phản hồi UWB
-// (byte 18-25), nên KHÔNG cần sửa ở phía Tag.
-// =======================================================
-#if MY_ANCHOR_ID == 0
-    float my_pos_x = 0.0f, my_pos_y = 0.0f;  // Góc dưới-trái
-#elif MY_ANCHOR_ID == 1
-    float my_pos_x = 5.0f, my_pos_y = 0.0f;  // Góc dưới-phải
-#elif MY_ANCHOR_ID == 2
-    float my_pos_x = 0.0f, my_pos_y = 5.0f;  // Góc trên-trái
-#else
-    float my_pos_x = 5.0f, my_pos_y = 5.0f;  // Góc trên-phải (A3)
-#endif
+/* ---------------------------------------------------------------
+   Tọa độ của anchor này – KHÔNG hardcode ở đây nữa.
+   Sẽ được điền bởi anchor_self_calibrate() lúc khởi động.
+   --------------------------------------------------------------- */
+static float my_pos_x = 0.0f;
+static float my_pos_y = 0.0f;
 
-// -------------------------------------------------------
-// Format gói phản hồi UWB (27 byte), Tag đọc để biết:
-//   - Timestamp Poll RX (T1): byte 10-13 → tính TOF
-//   - Timestamp Resp TX (T2): byte 14-17 → tính TOF
-//   - Tọa độ X của Anchor   : byte 18-21 (float, LE)
-//   - Tọa độ Y của Anchor   : byte 22-25 (float, LE)
-//   - Anchor ID             : byte 26
-//
-// Nhờ đó Tag tự biết tọa độ từng Anchor mà KHÔNG cần
-// hardcode ở phía Tag → tránh mâu thuẫn cấu hình.
-// -------------------------------------------------------
+/* ---------------------------------------------------------------
+   Format gói phản hồi UWB (27 byte):
+     [0-9]   Header
+     [10-13] T1: Poll RX timestamp  → Tag dùng để tính TOF
+     [14-17] T2: Resp TX timestamp  → Tag dùng để tính TOF
+     [18-21] Tọa độ X (float, LE)   → Tag đọc để biết vị trí anchor
+     [22-25] Tọa độ Y (float, LE)   → Tag đọc để biết vị trí anchor
+     [26]    Anchor ID               → Tag dùng để lưu đúng slot
+   --------------------------------------------------------------- */
 static uint8 tx_resp_msg[27] = {
-    0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, // [ 0- 9] Header
-    0, 0, 0, 0,                                            // [10-13] TS1: Poll RX timestamp
-    0, 0, 0, 0,                                            // [14-17] TS2: Resp TX timestamp
-    0, 0, 0, 0,                                            // [18-21] Anchor pos X (float)
-    0, 0, 0, 0,                                            // [22-25] Anchor pos Y (float)
-    0                                                       // [26]    Anchor ID
+    0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, /* [0-9]  Header  */
+    0, 0, 0, 0,                                            /* [10-13] T1      */
+    0, 0, 0, 0,                                            /* [14-17] T2      */
+    0, 0, 0, 0,                                            /* [18-21] pos X   */
+    0, 0, 0, 0,                                            /* [22-25] pos Y   */
+    0                                                       /* [26]    ID      */
 };
 
-#define POLL_RX_TO_RESP_TX_DLY_UUS 1500 
+/* 1500 us delay giữa nhận poll và gửi response */
+#define POLL_RX_TO_RESP_TX_DLY_UUS 1500
 #define UUS_TO_DWT_TIME            65536
-#define TX_ANT_DLY                 16436 
+#define TX_ANT_DLY                 16436
 
 static uint8 rx_buffer[64];
 
 static uint64 get_rx_timestamp_u64(void) {
-    uint8 ts_tab[5]; uint64 ts = 0;
-    dwt_readrxtimestamp(ts_tab);
-    for (int i = 4; i >= 0; i--) { ts <<= 8; ts |= ts_tab[i]; }
-    return ts;
+    uint8 ts[5]; uint64 t = 0;
+    dwt_readrxtimestamp(ts);
+    for (int i = 4; i >= 0; i--) { t <<= 8; t |= ts[i]; }
+    return t;
 }
 
-static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts) {
-    for (int i = 0; i < 4; i++) ts_field[i] = (ts >> (i * 8)) & 0xFF;
+static void resp_msg_set_ts(uint8 *field, uint64 ts) {
+    for (int i = 0; i < 4; i++) field[i] = (ts >> (i * 8)) & 0xFF;
 }
 
+/* ---------------------------------------------------------------
+   Task chính của Anchor
+   --------------------------------------------------------------- */
 void ss_responder_task_function(void *pvParameter) {
-    // Khởi tạo BLE cho Anchor
+
+    /* === BƯỚC 1: SELF-CALIBRATION ===
+       Tự động tính ra tọa độ (my_pos_x, my_pos_y) bằng cách đo
+       TWR đến các anchor có ID thấp hơn. Anchor gốc (ID=2) sẽ
+       trả về (0,0) ngay lập tức. Anchor slave chờ theo slot.    */
+    bool calib_ok = anchor_self_calibrate(MY_ANCHOR_ID, &my_pos_x, &my_pos_y);
+    if (!calib_ok) {
+        /* Fallback: dùng (0,0) nếu calibrate thất bại, hệ thống
+           vẫn chạy nhưng tọa độ của anchor này sẽ không chính xác */
+        printf("[A%d] WARNING: calibration failed, using (0,0)\r\n", MY_ANCHOR_ID);
+    }
+
+    /* === BƯỚC 2: KHỞI TẠO BLE VÀ NHÚNG TỌA ĐỘ VÀO GÓI UWB === */
     ble_raw_beacon_init(MY_ANCHOR_ID);
-    printf("[A%d] READY. POS: (%.2f, %.2f)\r\n", MY_ANCHOR_ID, my_pos_x, my_pos_y);
-    
-    // Nhúng sẵn tọa độ X, Y và ID vào mảng gửi qua UWB
+
+    /* Nhúng tọa độ và ID vào template gói phản hồi UWB một lần duy nhất.
+       Mỗi lần tag poll, anchor chỉ cần cập nhật timestamp (T1, T2),
+       tọa độ và ID giữ nguyên.                                    */
     memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
     memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
     tx_resp_msg[26] = (uint8)MY_ANCHOR_ID;
 
-    TickType_t last_ble_tx = 0;
-    static uint8_t anchor_seq = 0; // Bộ đếm BLE cho Anchor
+    printf("[A%d] READY. pos=(%.3f, %.3f)\r\n",
+           MY_ANCHOR_ID, my_pos_x, my_pos_y);
 
+    /* BLE beacon định kỳ và bộ đếm seq */
+    TickType_t last_ble_tx  = 0;
+    uint8_t    anchor_seq   = 0;
+
+    /* === BƯỚC 3: VÒNG LẶP CHÍNH – PHẢN HỒI TAG ===              */
     while (1) {
-        // Đặt timeout 65000 symbols (~65ms) để vòng lặp không bị kẹt chết ở UWB RX
+
+        /* Đặt timeout 65ms để không bị kẹt nếu không có gói nào  */
         dwt_setrxtimeout(65000);
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+        dwt_write32bitreg(SYS_STATUS_ID,
+            SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-        // Chờ nhận được khung UWB hoặc hết thời gian timeout (65ms)
-        while (!(dwt_read32bitreg(SYS_STATUS_ID) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
+        /* Chờ nhận gói UWB                                        */
+        while (!(dwt_read32bitreg(SYS_STATUS_ID) &
+                 (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
         uint32 status = dwt_read32bitreg(SYS_STATUS_ID);
-        if (status & SYS_STATUS_RXFCG) {
-            uint32 frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-            if (frame_len <= sizeof(rx_buffer)) {
-                dwt_readrxdata(rx_buffer, frame_len, 0);
-            }
 
+        if (status & SYS_STATUS_RXFCG) {
+            uint32 flen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+            if (flen <= sizeof(rx_buffer))
+                dwt_readrxdata(rx_buffer, flen, 0);
+
+            /* Chỉ xử lý gói poll (0xE0) gửi đúng anchor này.
+               Cùng function code với calibration poll của anchor
+               khác → responder phục vụ cả tag lẫn anchor peer.   */
             if (rx_buffer[9] == 0xE0 && rx_buffer[10] == (uint8)MY_ANCHOR_ID) {
-                uint64 poll_rx_ts = get_rx_timestamp_u64();
-                uint32 resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+
+                /* Tính thời điểm phát response                    */
+                uint64 poll_rx_ts   = get_rx_timestamp_u64();
+                uint32 resp_tx_time =
+                    (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
                 dwt_setdelayedtrxtime(resp_tx_time);
 
-                uint64 resp_tx_ts = (((uint64)(resp_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+                /* Timestamp chính xác (bao gồm antenna delay)     */
+                uint64 resp_tx_ts =
+                    (((uint64)(resp_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
 
+                /* Cập nhật T1 và T2 vào gói phản hồi              */
                 resp_msg_set_ts(&tx_resp_msg[10], poll_rx_ts);
                 resp_msg_set_ts(&tx_resp_msg[14], resp_tx_ts);
 
@@ -120,43 +142,44 @@ void ss_responder_task_function(void *pvParameter) {
                     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
                     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
                 }
+
             } else {
+                /* Gói không dành cho anchor này → reset RX         */
                 dwt_rxreset();
             }
         } else {
             dwt_rxreset();
         }
 
-        // ==========================================
-        // GỬI BLE ĐỊNH KỲ (MỖI 2 GIÂY) - CÓ SPAM LẶP
-        // ==========================================
+        /* === BLE BEACON ĐỊNH KỲ (5 giây) ===
+           Phát vị trí anchor qua BLE để PC/RPi có thể
+           hiển thị sơ đồ anchor khi debug.                        */
         TickType_t now = xTaskGetTickCount();
         if (now - last_ble_tx > pdMS_TO_TICKS(5000)) {
-            // In ra UART dạng JSON
-            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", 
+            printf("{\"id\":%d,\"x\":%.3f,\"y\":%.3f,\"role\":\"anchor\"}\r\n",
                    MY_ANCHOR_ID, my_pos_x, my_pos_y);
 
-            // Đóng gói nhị phân (11 byte)
+            /* Gói BLE compact (11 byte): start='[', id, seq, x, y */
             #pragma pack(push, 1)
             typedef struct {
-                uint8_t start_byte; 
+                uint8_t start_byte;  /* '[' = anchor packet       */
                 uint8_t id;
                 uint8_t seq;
-                float x;
-                float y;
-            } ble_anchor_packed_t;
+                float   x;
+                float   y;
+            } ble_anchor_pkt_t;
             #pragma pack(pop)
 
-            ble_anchor_packed_t pkt;
-            pkt.start_byte = '[';  // Mã ASCII '[' để nhận diện là Anchor
-            pkt.id = MY_ANCHOR_ID;
-            pkt.x = my_pos_x;
-            pkt.y = my_pos_y;
+            ble_anchor_pkt_t pkt;
+            pkt.start_byte = '[';
+            pkt.id         = MY_ANCHOR_ID;
+            pkt.x          = my_pos_x;
+            pkt.y          = my_pos_y;
 
-            // Bắn lặp lại 10 lần để chắc chắn máy tính bắt được
-            for(int i = 0; i < 10; i++) {
+            /* Phát lặp 10 lần để đảm bảo bắt được */
+            for (int i = 0; i < 10; i++) {
                 pkt.seq = anchor_seq++;
-                ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+                ble_raw_beacon_send_payload((uint8_t*)&pkt, sizeof(pkt));
                 vTaskDelay(pdMS_TO_TICKS(15));
             }
 

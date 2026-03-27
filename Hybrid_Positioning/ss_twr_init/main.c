@@ -27,9 +27,16 @@
 #include "ble_beacon.h"
 #include "ble_scanner.h"
 #include "ble_hybrid.h"
+#include "anchor_calib.h"  /* ANCHOR_REF_ID, quy ước NODE_ID */
 //#define SIMULATION_MODE
 #include "simulation.c"
 
+/* ---------------------------------------------------------
+   NODE_ID – Thay số này khi nạp firmware cho từng mạch:
+     1 → Tag (Initiator)
+     2 → Anchor gốc (Reference) – cố định tại (0, 0)
+     3,4,5… → Anchor slave – tự tính tọa độ khi khởi động
+   --------------------------------------------------------- */
 #ifndef NODE_ID
 #define NODE_ID 1
 #warning "NODE_ID not defined, defaulting to 1 (Tag)"
@@ -117,12 +124,10 @@ int main(void)
 
 #if NODE_ID == 1
     printf("(TAG - Initiator)\r\n");
-
-#elif NODE_ID == 0
-    printf("(MASTER ANCHOR)\r\n");
-
+#elif NODE_ID == ANCHOR_REF_ID
+    printf("(ANCHOR REFERENCE - will be at 0,0)\r\n");
 #else
-    printf("(ANCHOR SLAVE %d)\r\n", NODE_ID - 2);
+    printf("(ANCHOR SLAVE - will self-calibrate position)\r\n");
 #endif
 
     // === Cấu hình ngắt DW1000 ===
@@ -154,26 +159,16 @@ int main(void)
 #else
 
 #if NODE_ID == 1
-    // TAG
+    /* === TAG === */
     xTaskCreate(ss_initiator_task_function, "UWB_INIT",
                 configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
 
-#elif NODE_ID == 0
-        master_hybrid_init();
-    master_hybrid_reset();
-    ble_raw_beacon_init(0);
-    ble_scanner_init();
-    xTaskCreate(ss_responder_task_function, "UWB_RESP",
-                configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
-    //xTaskCreate(ble_scan_task, "BLE_SCAN",
-    //            configMINIMAL_STACK_SIZE + 300,
-    //            NULL, 2, NULL);
-    
-
 #else
-    // ANCHOR THƯỜNG
+    /* === ANCHOR (cả reference lẫn slave) ===
+       Stack lớn hơn để chứa cả logic calibrate (calib_rx_buf,
+       known_pos[], known_dist[] được khai báo trong anchor_calib.c) */
     xTaskCreate(ss_responder_task_function, "UWB_RESP",
-                configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
+                configMINIMAL_STACK_SIZE + 400, NULL, 3, &uwb_task_handle);
 #endif
 
     // === Bắt đầu FreeRTOS ===

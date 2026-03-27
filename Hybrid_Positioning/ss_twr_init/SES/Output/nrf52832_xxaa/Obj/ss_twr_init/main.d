@@ -84,4 +84,5 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/main.o: \
  D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_scanner.h \
  D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_hybrid.h \
  D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_tdoa_report.h \
+ D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\anchor_calib.h \
  D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\simulation.c
