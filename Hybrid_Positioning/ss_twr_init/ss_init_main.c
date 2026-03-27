@@ -68,11 +68,11 @@ bool calculate_tag_position(float *out_x, float *out_y) {
     uint32_t current_tick = xTaskGetTickCount();
     for (int i = 0; i < MAX_ANCHORS; i++) {
         // Anchor hợp lệ khi:
-        //   1. is_valid   : đã có ít nhất 1 khoảng cách đo được sau calibrate
-        //   2. pos_known  : đã nhận được tọa độ (x, y) từ gói UWB phản hồi
-        //   3. Chưa quá 2 giây kể từ lần đo cuối (tránh dùng dữ liệu cũ)
+        //   1. is_valid : đã có ít nhất 1 khoảng cách đo được
+        //   2. Chưa quá 2 giây kể từ lần đo cuối
+        // Bỏ yêu cầu pos_known tạm thời - anchor mới (self-calib) mới cần
         bool fresh = (current_tick - anchors_info[i].last_update_tick < pdMS_TO_TICKS(2000));
-        if (anchors_info[i].is_valid && anchors_info[i].pos_known && fresh) {
+        if (anchors_info[i].is_valid && fresh) {
             valid_anchors[count].x  = (double)anchors_info[i].x;
             valid_anchors[count].y  = (double)anchors_info[i].y;
             valid_distances[count]  = (double)anchors_info[i].dist;
@@ -81,7 +81,11 @@ bool calculate_tag_position(float *out_x, float *out_y) {
     }
 
     // Cần ít nhất 3 anchor để giải multilateration 2D
-    if (count < 3) return false;
+    // (Hạ xuống 2 khi test nếu chưa đủ anchor)
+    if (count < 3) {
+        printf("[DBG] valid anchors: %d/3 needed\r\n", count);
+        return false;
+    }
 
     int ok = tof_2d_localize(valid_anchors, count, valid_distances, &g_tag_pos_est);
 
@@ -179,33 +183,33 @@ void ss_initiator_task_function(void *pvParameter) {
                         memcpy(&anc_y, &rx_buffer[22], sizeof(float));
                         anc_id_from_pkt = rx_buffer[26];
 
-                        // Kiểm tra ID hợp lệ, tránh ghi sai slot
-                        if (anc_id_from_pkt < MAX_ANCHORS) {
-                            anchors_info[anc_id_from_pkt].x = anc_x;
-                            anchors_info[anc_id_from_pkt].y = anc_y;
-                            anchors_info[anc_id_from_pkt].pos_known = true;
-                        }
+                        // Lưu tọa độ anchor vào slot theo anchor index (a),
+                        // không dùng anc_id_from_pkt để tránh mismatch khi anchor
+                        // chưa tự calibrate (gửi ID khác hoặc 0).
+                        anchors_info[a].x = anc_x;
+                        anchors_info[a].y = anc_y;
+                        anchors_info[a].pos_known = true;
 
                         if (raw_dist > 0.05f && raw_dist < 100.0f) {
 
-                            // === Calibrate offset ngầm ===
+                            // Calibrate offset ngầm (không gate - vẫn dùng dist
+                            // ngay cả khi chưa có đủ mẫu, chỉ bù offset sau)
                             if (!is_calibrated[a]) {
                                 calib_sum[a]   += raw_dist;
                                 calib_count[a]++;
                                 if (calib_count[a] == CALIB_SAMPLES) {
-                                    float avg_dist    = calib_sum[a] / CALIB_SAMPLES;
-                                    anchor_offset[a]  = avg_dist - CALIB_TRUE_DISTANCE;
-                                    is_calibrated[a]  = true;
+                                    float avg_dist   = calib_sum[a] / CALIB_SAMPLES;
+                                    anchor_offset[a] = avg_dist - CALIB_TRUE_DISTANCE;
+                                    is_calibrated[a] = true;
                                     printf("[CAL] A%d offset=%.3fm\r\n", a, anchor_offset[a]);
-                                } else {
-                                    // [FIX 3] CALIBRATION GATE: bỏ qua khoảng cách khi
-                                    // chưa đủ mẫu calibrate → tránh solver dùng dist sai
-                                    continue;
                                 }
+                                // Không có gate: vẫn dùng raw_dist (offset=0)
                             }
 
                             float dist = raw_dist - anchor_offset[a];
                             if (dist <= 0.0f) dist = 0.01f;
+
+                            printf("[TOF] A%d=%.2fm raw=%.2fm\r\n", a, dist, raw_dist);
 
                             anchors_info[a].dist             = dist;
                             anchors_info[a].last_update_tick = xTaskGetTickCount();
