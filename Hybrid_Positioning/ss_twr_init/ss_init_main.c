@@ -95,6 +95,8 @@ void ss_initiator_task_function(void *pvParameter) {
         anchors_info[i].last_update_tick = 0;
     }
 
+    static uint8_t tag_seq = 0; // Bộ đếm BLE cho Tag
+
     while (1) {
         g_cycle_id++;
         
@@ -160,7 +162,7 @@ void ss_initiator_task_function(void *pvParameter) {
         } 
 
         // ==========================================
-        // 2. TÍNH TỌA ĐỘ VÀ ĐÓNG GÓI GỬI BLE
+        // 2. TÍNH TỌA ĐỘ VÀ ĐÓNG GÓI GỬI BLE CÓ LẶP
         // ==========================================
         float tag_x = 0.0f, tag_y = 0.0f;
         
@@ -174,11 +176,12 @@ void ss_initiator_task_function(void *pvParameter) {
             printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f]}\r\n", 
                    TAG_ID, tag_x, tag_y, d0, d1, d2);
 
-            // Cấu trúc ép sát bộ nhớ (Packed Struct) để gửi BLE siêu nhẹ (Chỉ 22 Bytes)
+            // Cấu trúc ép sát bộ nhớ (Packed Struct) để gửi BLE siêu nhẹ (23 Bytes)
             #pragma pack(push, 1)
             typedef struct {
                 uint8_t start_byte; 
                 uint8_t id;
+                uint8_t seq;
                 float x;
                 float y;
                 float d[3];
@@ -194,13 +197,17 @@ void ss_initiator_task_function(void *pvParameter) {
             pkt.d[1] = d1; 
             pkt.d[2] = d2;
 
-            // Truyền 22 bytes này qua BLE
-            ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+            // Bắn lặp lại 10 lần để chắc chắn máy tính bắt được
+            for(int i = 0; i < 10; i++) {
+                pkt.seq = tag_seq++;
+                ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+                vTaskDelay(pdMS_TO_TICKS(15));
+            }
 
         } else {
             printf("[!] Waiting for valid TOF data...\r\n");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
+        vTaskDelay(pdMS_TO_TICKS(100)); 
     }
 }

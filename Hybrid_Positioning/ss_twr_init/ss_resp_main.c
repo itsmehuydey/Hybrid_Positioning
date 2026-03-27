@@ -63,6 +63,7 @@ void ss_responder_task_function(void *pvParameter) {
     tx_resp_msg[26] = (uint8)MY_ANCHOR_ID;
 
     TickType_t last_ble_tx = 0;
+    static uint8_t anchor_seq = 0; // Bộ đếm BLE cho Anchor
 
     while (1) {
         // Đặt timeout 65000 symbols (~65ms) để vòng lặp không bị kẹt chết ở UWB RX
@@ -105,19 +106,20 @@ void ss_responder_task_function(void *pvParameter) {
         }
 
         // ==========================================
-        // GỬI BLE ĐỊNH KỲ (MỖI 1 GIÂY)
+        // GỬI BLE ĐỊNH KỲ (MỖI 2 GIÂY) - CÓ SPAM LẶP
         // ==========================================
         TickType_t now = xTaskGetTickCount();
-        if (now - last_ble_tx > pdMS_TO_TICKS(2000)) {
+        if (now - last_ble_tx > pdMS_TO_TICKS(5000)) {
             // In ra UART dạng JSON
             printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", 
                    MY_ANCHOR_ID, my_pos_x, my_pos_y);
 
-            // Đóng gói nhị phân siêu nhỏ (10 byte) để qua BLE
+            // Đóng gói nhị phân (11 byte)
             #pragma pack(push, 1)
             typedef struct {
                 uint8_t start_byte; 
                 uint8_t id;
+                uint8_t seq;
                 float x;
                 float y;
             } ble_anchor_packed_t;
@@ -129,7 +131,13 @@ void ss_responder_task_function(void *pvParameter) {
             pkt.x = my_pos_x;
             pkt.y = my_pos_y;
 
-            ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+            // Bắn lặp lại 10 lần để chắc chắn máy tính bắt được
+            for(int i = 0; i < 10; i++) {
+                pkt.seq = anchor_seq++;
+                ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+                vTaskDelay(pdMS_TO_TICKS(15));
+            }
+
             last_ble_tx = now;
         }
     }
