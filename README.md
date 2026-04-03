@@ -1,5 +1,4 @@
-# 📡 UWB Real-Time Localization System
+# Development of a real-time positioning system using Ultra-wideband (UWB) technology
 
-## 🚀 Overview
-Dự án xây dựng hệ thống định vị thời gian thực sử dụng **UWB (Ultra-Wideband)**.  
-Hệ thống thu thập dữ liệu từ các node UWB, xử lý và hiển thị vị trí trên giao diện
+## Overview
+This is a firmware and algorithm project aimed at developing a real-time indoor positioning solution using Ultra-Wideband (UWB) technology. The system focuses on low-level hardware communication, distance measurement acquisition, and the application of noise filtering algorithms to produce accurate spatial coordinates.
