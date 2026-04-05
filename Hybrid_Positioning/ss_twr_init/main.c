@@ -37,10 +37,8 @@
      2 → Anchor gốc (Reference) – cố định tại (0, 0)
      3,4,5… → Anchor slave – tự tính tọa độ khi khởi động
    --------------------------------------------------------- */
-#ifndef NODE_ID
-#define NODE_ID 1
-#warning "NODE_ID not defined, defaulting to 1 (Tag)"
-#endif
+/* NODE_ID được định nghĩa trong anchor_calib.h (include ở trên).
+   Sửa ở đó để áp dụng cho toàn bộ project. */
 
 
 // Tọa độ các anchor (chỉ dùng cho Tag)

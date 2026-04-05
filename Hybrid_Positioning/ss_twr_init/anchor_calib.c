@@ -68,10 +68,11 @@ static int calib_do_twr(uint8_t target_id,
         dwt_writetxdata(sizeof(calib_poll_msg), calib_poll_msg, 0);
         dwt_writetxfctrl(sizeof(calib_poll_msg), 0, 1);
 
+        /* [FIX] setrxtimeout phải gọi TRƯỚC starttx */
+        dwt_setrxtimeout(CALIB_RX_TIMEOUT);
+
         if (dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED) != DWT_SUCCESS)
             continue;
-
-        dwt_setrxtimeout(CALIB_RX_TIMEOUT);
 
         /* Chờ sự kiện */
         while (!((dwt_read32bitreg(SYS_STATUS_ID)) &

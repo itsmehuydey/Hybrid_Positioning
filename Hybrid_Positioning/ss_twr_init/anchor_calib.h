@@ -25,9 +25,19 @@
 #define ANCHOR_REF_ID   2u      /* NODE_ID của anchor gốc (0,0)     */
 #define CALIB_SLOT_MS   5000u   /* Thời gian chờ mỗi slot (ms)      */
 
+/* =============================================================
+   *** CHỈ SỬA SỐ NÀY KHI NẠP FIRMWARE CHO TỪNG MẠCH ***
+     1 → Tag
+     2 → Anchor gốc (Reference) – tọa độ (0, 0)
+     3 → Anchor slave 1
+     4 → Anchor slave 2
+   ============================================================= */
+#ifndef NODE_ID
+#define NODE_ID  1   /* <<< SỬA SỐ NÀY */
+#endif
+
 /**
- * @brief  Tự động hiệu chỉnh vị trí anchor.
- *
+ * @brief  Tự động hiệu chỉnh vị trí anchor. *
  * @param  my_node_id  NODE_ID của anchor đang chạy hàm này
  * @param  out_x       [out] Tọa độ X sau khi hiệu chỉnh (m)
  * @param  out_y       [out] Tọa độ Y sau khi hiệu chỉnh (m)
