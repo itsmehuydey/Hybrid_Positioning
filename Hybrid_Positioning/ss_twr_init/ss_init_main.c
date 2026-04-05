@@ -9,31 +9,30 @@
 #include "port_platform.h"
 #include "ble_beacon.h"
 
-// THÊM THƯ VIỆN SOLVER MỚI VÀO ĐÂY
 #include "utils.h"
 
-#define MAX_ANCHORS 3
+// Đo 4 Anchor
+#define MAX_ANCHORS 4
 #define SPEED_OF_LIGHT 299702547.0
 
 #define FREQ_OFFSET_MULTIPLIER          (998.4e6 / 2.0 / 1024.0 / 131072.0)
 #define HERTZ_TO_PPM_MULTIPLIER_CHAN_5  (-1.0e6 / 6489.6e6)
 
-// --- ID CỦA TAG HIỆN TẠI ---
 #define TAG_ID 1
 
-// --- TỌA ĐỘ ANCHOR CỐ ĐỊNH ---
-static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f}; 
-static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f};
+// TỌA ĐỘ ANCHOR CỐ ĐỊNH 
+static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f, 1.0f}; 
+static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 2.0f, 2.0f};
 
+// CẤU HÌNH AUTO-CALIBRATION ẨN
+#define CALIB_SAMPLES 10
+#define CALIB_TRUE_DIST 0.7071f  // Khoảng cách thực tế từ tâm (0.5, 0.5) đến các góc
 
-#define CALIB_SAMPLES 10                  
-#define CALIB_TRUE_DISTANCE 1.0f          
-
-static int calib_count[MAX_ANCHORS] = {0};
-static float calib_sum[MAX_ANCHORS] = {0};
-static float anchor_offset[MAX_ANCHORS] = {0}; 
-static bool is_calibrated[MAX_ANCHORS] = {false};
-// ---------------------------------------
+// Các biến lưu trạng thái tự động calib cho từng anchor riêng biệt
+static float dynamic_anchor_offset[MAX_ANCHORS] = {0.0f, 0.0f, 0.0f, 0.0f};
+static int calib_count[MAX_ANCHORS] = {0, 0, 0, 0};
+static float raw_dist_sum[MAX_ANCHORS] = {0.0f, 0.0f, 0.0f, 0.0f};
+static bool is_calib_done[MAX_ANCHORS] = {false, false, false, false};
 
 static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
 static uint8 rx_buffer[32];
@@ -87,22 +86,24 @@ bool calculate_tag_position(float *out_x, float *out_y) {
 
 void ss_initiator_task_function(void *pvParameter) {
     ble_raw_beacon_init(TAG_ID);
-    printf("[TAG] SYSTEM STARTING - BACKGROUND CALIBRATION ENABLED\r\n");
-    printf("[INFO] Place Tag %.2fm from Anchors for the first %d samples.\r\n\n", CALIB_TRUE_DISTANCE, CALIB_SAMPLES);
-
+    
+    // Khởi tạo trạng thái UWB
     for (int i = 0; i < MAX_ANCHORS; i++) {
         anchors_info[i].is_valid = false;
         anchors_info[i].last_update_tick = 0;
     }
 
-    static uint8_t tag_seq = 0; // Bộ đếm BLE cho Tag
+    static uint8_t tag_seq = 0; 
+
+    // Các biến dùng để cộng dồn 5 mẫu
+    static int batch_count = 0;
+    static float sum_x = 0.0f, sum_y = 0.0f;
+    static float sum_d0 = 0.0f, sum_d1 = 0.0f, sum_d2 = 0.0f, sum_d3 = 0.0f;
 
     while (1) {
         g_cycle_id++;
         
-        // ==========================================
-        // 1. QUÁ TRÌNH UWB ĐO KHOẢNG CÁCH
-        // ==========================================
+        // 1. UWB ĐO KHOẢNG CÁCH TUẦN TỰ TỪ 0->3
         for (int a = 0; a < MAX_ANCHORS; a++) {
             reset_uwb_state(); 
             vTaskDelay(pdMS_TO_TICKS(5)); 
@@ -136,23 +137,26 @@ void ss_initiator_task_function(void *pvParameter) {
 
                         if (raw_dist > 0.05f && raw_dist < 100.0f) {
                             
-                            if (!is_calibrated[a]) {
-                                calib_sum[a] += raw_dist;
+                            // --- AUTO-CALIBRATION ẨN TRONG NỀN ---
+                            if (!is_calib_done[a]) {
+                                raw_dist_sum[a] += raw_dist;
                                 calib_count[a]++;
                                 
-                                if (calib_count[a] == CALIB_SAMPLES) {
-                                    float avg_dist = calib_sum[a] / CALIB_SAMPLES;
-                                    anchor_offset[a] = avg_dist - CALIB_TRUE_DISTANCE;
-                                    is_calibrated[a] = true;
+                                if (calib_count[a] >= CALIB_SAMPLES) {
+                                    dynamic_anchor_offset[a] = (raw_dist_sum[a] / (float)CALIB_SAMPLES) - CALIB_TRUE_DIST;
+                                    is_calib_done[a] = true;
                                 }
                             }
-
-                            float dist = raw_dist - anchor_offset[a];
+                            
+                            float dist = raw_dist - dynamic_anchor_offset[a];
                             if (dist <= 0.0f) dist = 0.01f;
 
                             anchors_info[a].x = HARDCODED_ANCHOR_X[a];
                             anchors_info[a].y = HARDCODED_ANCHOR_Y[a];
-                            anchors_info[a].dist = dist;
+                            
+                            anchors_info[a].dist = (anchors_info[a].is_valid) ? 
+                                                   (anchors_info[a].dist * 0.7f + dist * 0.3f) : dist;
+                                                   
                             anchors_info[a].last_update_tick = xTaskGetTickCount();
                             anchors_info[a].is_valid = true;
                         }
@@ -161,53 +165,71 @@ void ss_initiator_task_function(void *pvParameter) {
             }
         } 
 
-        // ==========================================
-        // 2. TÍNH TỌA ĐỘ VÀ ĐÓNG GÓI GỬI BLE CÓ LẶP
-        // ==========================================
+        // 2. TÍNH TỌA ĐỘ VÀ CỘNG DỒN DỮ LIỆU
         float tag_x = 0.0f, tag_y = 0.0f;
         
         if (calculate_tag_position(&tag_x, &tag_y)) {
-            // Lấy khoảng cách của 3 anchor đầu tiên (nếu có)
             float d0 = anchors_info[0].is_valid ? anchors_info[0].dist : 0.0f;
             float d1 = anchors_info[1].is_valid ? anchors_info[1].dist : 0.0f;
             float d2 = anchors_info[2].is_valid ? anchors_info[2].dist : 0.0f;
+            float d3 = anchors_info[3].is_valid ? anchors_info[3].dist : 0.0f;
 
-            // In JSON ra màn hình Serial (UART) để bạn theo dõi trực tiếp qua cáp
-            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f]}\r\n", 
-                   TAG_ID, tag_x, tag_y, d0, d1, d2);
+            // Cộng dồn các giá trị
+            sum_x += tag_x;
+            sum_y += tag_y;
+            sum_d0 += d0;
+            sum_d1 += d1;
+            sum_d2 += d2;
+            sum_d3 += d3;
+            batch_count++;
 
-            // Cấu trúc ép sát bộ nhớ (Packed Struct) để gửi BLE siêu nhẹ (23 Bytes)
-            #pragma pack(push, 1)
-            typedef struct {
-                uint8_t start_byte; 
-                uint8_t id;
-                uint8_t seq;
-                float x;
-                float y;
-                float d[3];
-            } ble_packed_data_t;
-            #pragma pack(pop)
+            // 3. ĐỦ 5 MẪU -> CHIA TRUNG BÌNH -> IN LOG & GỬI BLE
+            if (batch_count >= 5) {
+                float avg_x = sum_x / 5.0f;
+                float avg_y = sum_y / 5.0f;
+                float avg_d0 = sum_d0 / 5.0f;
+                float avg_d1 = sum_d1 / 5.0f;
+                float avg_d2 = sum_d2 / 5.0f;
+                float avg_d3 = sum_d3 / 5.0f;
 
-            ble_packed_data_t pkt;
-            pkt.start_byte = '{';  // Ký hiệu nhận diện cho code Python
-            pkt.id = TAG_ID;
-            pkt.x = tag_x;
-            pkt.y = tag_y;
-            pkt.d[0] = d0; 
-            pkt.d[1] = d1; 
-            pkt.d[2] = d2;
+                // Log ra format JSON với dữ liệu đã được làm mượt
+                printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f,%.2f]}\r\n", 
+                       TAG_ID, avg_x, avg_y, avg_d0, avg_d1, avg_d2, avg_d3);
 
-            // Bắn lặp lại 10 lần để chắc chắn máy tính bắt được
-            for(int i = 0; i < 10; i++) {
-                pkt.seq = tag_seq++;
-                ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
-                vTaskDelay(pdMS_TO_TICKS(15));
+                // Gửi BLE
+                #pragma pack(push, 1)
+                typedef struct {
+                    uint8_t start_byte; 
+                    uint8_t id;
+                    uint8_t seq;
+                    float x;
+                    float y;
+                } ble_light_data_t;
+                #pragma pack(pop)
+
+                ble_light_data_t pkt;
+                pkt.start_byte = '{';  
+                pkt.id = TAG_ID;
+                pkt.x = avg_x;
+                pkt.y = avg_y;
+
+                for(int i = 0; i < 5; i++) {
+                    pkt.seq = tag_seq++;
+                    ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+                    vTaskDelay(pdMS_TO_TICKS(15));
+                }
+
+                // Reset lại các biến đếm để bắt đầu chu kỳ 5 mẫu mới
+                batch_count = 0;
+                sum_x = 0.0f; 
+                sum_y = 0.0f;
+                sum_d0 = 0.0f; 
+                sum_d1 = 0.0f; 
+                sum_d2 = 0.0f; 
+                sum_d3 = 0.0f;
             }
-
-        } else {
-            printf("[!] Waiting for valid TOF data...\r\n");
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
+        vTaskDelay(pdMS_TO_TICKS(200)); 
     }
 }

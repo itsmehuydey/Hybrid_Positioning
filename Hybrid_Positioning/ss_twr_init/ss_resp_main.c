@@ -10,20 +10,21 @@
 
 // Thay đổi NODE_ID (0, 1, 2, 3) tương ứng với từng mạch Anchor khi nạp code
 #ifndef NODE_ID
-#define NODE_ID 2
+#define NODE_ID 3
 #endif
 #define MY_ANCHOR_ID NODE_ID
 
-// Cấu hình tọa độ (mét) tương ứng với từng Anchor ID
 #if MY_ANCHOR_ID == 0
-    float my_pos_x = 0.0f, my_pos_y = 0.0f;
+    float my_pos_x = 0.0f, my_pos_y = 0.0f;  // Góc dưới trái
 #elif MY_ANCHOR_ID == 1
-    float my_pos_x = 1.0f, my_pos_y = 0.0f;
+    float my_pos_x = 1.0f, my_pos_y = 0.0f;  // Góc dưới phải
 #elif MY_ANCHOR_ID == 2
-    float my_pos_x = 0.0f, my_pos_y = 1.0f;
+    float my_pos_x = 0.0f, my_pos_y = 2.0f;  // Góc trên trái
 #else
-    float my_pos_x = 1.0f, my_pos_y = 1.0f;
+    float my_pos_x = 1.0f, my_pos_y = 2.0f;  // Góc trên phải (Anchor 3)
 #endif
+
+
 
 /* Chiều dài mảng 27 byte chứa X, Y (byte 18-25) và Anchor ID (byte 26) */
 static uint8 tx_resp_msg[27] = {
@@ -109,7 +110,7 @@ void ss_responder_task_function(void *pvParameter) {
         // GỬI BLE ĐỊNH KỲ (MỖI 2 GIÂY) - CÓ SPAM LẶP
         // ==========================================
         TickType_t now = xTaskGetTickCount();
-        if (now - last_ble_tx > pdMS_TO_TICKS(5000)) {
+        if (now - last_ble_tx > pdMS_TO_TICKS(15000)) {
             // In ra UART dạng JSON
             printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", 
                    MY_ANCHOR_ID, my_pos_x, my_pos_y);
