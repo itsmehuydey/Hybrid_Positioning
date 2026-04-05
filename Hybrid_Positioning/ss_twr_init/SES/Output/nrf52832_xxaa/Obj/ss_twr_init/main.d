@@ -46,6 +46,9 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/main.o: \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/mpu_wrappers.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/task.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/list.h \
+ ../../../nRF5_SDK_14.2.0/external/freertos/source/include/queue.h \
+ ../../../nRF5_SDK_14.2.0/external/freertos/source/include/semphr.h \
+ ../../../nRF5_SDK_14.2.0/external/freertos/source/include/queue.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/timers.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/task.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/bsp/bsp.h \

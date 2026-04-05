@@ -14,8 +14,6 @@
 #include "nrf_log.h"
 #include "nrf.h"
 #include "app_error.h"
-#include "app_util_platform.h"
-#include "app_error.h"
 #include <string.h>
 #include "port_platform.h"
 #include "deca_types.h"
@@ -30,35 +28,9 @@
 //#define SIMULATION_MODE
 #include "simulation.c"
 
-#ifndef NODE_ID
-#define NODE_ID 1
-#warning "NODE_ID not defined, defaulting to 1 (Tag)"
-#endif
-
-
-// Tọa độ các anchor (chỉ dùng cho Tag)
-#if NODE_ID == 1
-//vec3 anc[N_ANCHORS] = {
-//    {0.0, 0.0, 2.5},  
-//    {2.0, 0.0, 2.5},
-//    {2.0, 1.0, 2.5},
-//    {0.0, 1.0, 2.5}
-//};
-
-//vec3 pos_est = {0, 0, 1.0}; 
-#endif
-
 // Cấu hình DW1000
 static dwt_config_t config = {
-    5,                     // Channel
-    DWT_PRF_64M,           // Pulse repetition frequency
-    DWT_PLEN_128,          // Preamble length
-    DWT_PAC8,              // Preamble acquisition chunk size
-    10, 10,                // Tx and Rx preamble codes
-    0,                     // Non-standard SFD
-    DWT_BR_6M8,            // Data rate
-    DWT_PHRMODE_STD,       // PHY header mode
-    (129 + 8 - 8)          // SFD length
+    5, DWT_PRF_64M, DWT_PLEN_128, DWT_PAC8, 10, 10, 0, DWT_BR_6M8, DWT_PHRMODE_STD, (129 + 8 - 8)
 };
 
 #define PRE_TIMEOUT 1000
@@ -69,61 +41,70 @@ static dwt_config_t config = {
 #define TASK_DELAY 200
 #define TIMER_PERIOD 2000
 
-// Task handles
 TaskHandle_t led_task_handle = NULL;
 TaskHandle_t uwb_task_handle = NULL;
 TimerHandle_t led_timer_handle = NULL;
 
-// Hàm LED nhấp nháy
-static void led_toggle_task_function(void *pvParameter)
-{
+static void led_toggle_task_function(void *pvParameter) {
     UNUSED_PARAMETER(pvParameter);
-    while (true)
-    {
+    while (true) {
         LEDS_INVERT(BSP_LED_0_MASK);
         vTaskDelay(TASK_DELAY);
     }
 }
 
-static void led_toggle_timer_callback(void *pvParameter)
-{
+static void led_toggle_timer_callback(void *pvParameter) {
     UNUSED_PARAMETER(pvParameter);
     LEDS_INVERT(BSP_LED_1_MASK);
 }
 
-// Forward declarations
+// Khai báo hàm cấu hình từ các file khác
 extern void ss_initiator_task_function(void *pvParameter);
 extern void ss_responder_task_function(void *pvParameter);
-
-
+extern void set_anchor_config(uint8_t id, float x, float y);
+extern void set_tag_config(uint8_t id);
 
 int main(void)
 {
-
     // === Khởi tạo LED ===
     LEDS_CONFIGURE(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
     LEDS_ON(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
+
+    // === Cấu hình UART ===
+    // boUART_Init();
+
+    // Lấy MAC Address của vi điều khiển
+    uint16_t my_mac16 = (uint16_t)(NRF_FICR->DEVICEADDR[0] & 0xFFFF);
+
+    printf("\r\n=======================================\r\n");
+    printf("=== UWB Hybrid Localization System ===\r\n");
+    printf("MAC Address mach nay: %04X\r\n", my_mac16);
+    printf("Dang cho cau hinh tu Web...\r\n");
+    printf("=======================================\r\n");
+
+    // Khởi tạo bộ quét BLE để bắt lệnh từ Web
+    ble_scanner_init();
+
+    web_config_t my_config;
+    
+    // Vòng lặp vô hạn chờ lệnh (Không chạy UWB nếu chưa có lệnh)
+    while(1) {
+        if (ble_scan_for_config(&my_config)) {
+            printf("\r\n>> DA NHAN LENH CAU HINH <<\r\n");
+            printf("Magic: %c | MAC: %04X | Role: %d | ID: %d\r\n", 
+                   my_config.magic_byte, my_config.target_mac, my_config.role, my_config.node_id);
+            break; // Thoát vòng lặp chờ
+        }
+        nrf_delay_ms(10); // Chờ 10ms rồi quét tiếp
+    }
+
+    // Tắt Radio sau khi nhận xong để nhường chỗ cho UWB/BLE Beacon
+    NRF_RADIO->TASKS_DISABLE = 1;
 
     // === Tạo task LED ===
     xTaskCreate(led_toggle_task_function, "LED0", configMINIMAL_STACK_SIZE + 200, NULL, 2, &led_task_handle);
     led_timer_handle = xTimerCreate("LED1", TIMER_PERIOD, pdTRUE, NULL, led_toggle_timer_callback);
     xTimerStart(led_timer_handle, 0);
-
-    // === Cấu hình UART ===
-   // boUART_Init();
-
-    printf("\r\n=== UWB Hybrid Localization System ===\r\n");
-    printf("Node ID: %d ", NODE_ID);
-
-#if NODE_ID == 1
-    printf("(TAG - Initiator)\r\n");
-
-#elif NODE_ID == 0
-    printf("(MASTER ANCHOR)\r\n");
-
-#else
-    printf("(ANCHOR SLAVE %d)\r\n", NODE_ID - 2);
-#endif
 
     // === Cấu hình ngắt DW1000 ===
     nrf_gpio_cfg_input(DW1000_IRQ, NRF_GPIO_PIN_NOPULL);
@@ -132,10 +113,9 @@ int main(void)
     reset_DW1000();
     port_set_dw1000_slowrate();
 
-    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
-    {
+    if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR) {
         printf("ERROR: DW1000 init failed!\r\n");
-        while (1) { LEDS_INVERT(BSP_LED_2_MASK); vTaskDelay(100); }
+        while (1) { LEDS_INVERT(BSP_LED_2_MASK); nrf_delay_ms(100); }
     }
 
     port_set_dw1000_fastrate();
@@ -145,41 +125,37 @@ int main(void)
     dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
     dwt_setrxtimeout(0);
 
-#ifdef SIMULATION_MODE
-    printf("[SIMULATION MODE] Running virtual UWB measurements...\r\n");
-    while (1) {
-        simulate_measurement_cycle();
-        nrf_delay_ms(1000);
+    // === PHÂN LUỒNG ROLE SAU KHI NHẬN CẤU HÌNH ===
+    if (my_config.role == 1) {
+        // Khởi động TAG
+        printf("KHOI DONG CHE DO: TAG (ID = %d)\r\n", my_config.node_id);
+        set_tag_config(my_config.node_id);
+        xTaskCreate(ss_initiator_task_function, "UWB_INIT", configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
+    } 
+    else if (my_config.role == 2) {
+        // Khởi động ANCHOR
+        float ax = 0.0f, ay = 0.0f;
+        // Tự động gán tọa độ dựa theo ID (Giống macro if-else cũ)
+        if (my_config.node_id == 0)      { ax = 0.0f; ay = 0.0f; } // Góc dưới trái
+        else if (my_config.node_id == 1) { ax = 1.0f; ay = 0.0f; } // Góc dưới phải
+        else if (my_config.node_id == 2) { ax = 0.0f; ay = 2.0f; } // Góc trên trái
+        else                             { ax = 1.0f; ay = 2.0f; } // Góc trên phải
+        
+        printf("KHOI DONG CHE DO: ANCHOR (ID = %d, Toa do: %.1f, %.1f)\r\n", my_config.node_id, ax, ay);
+        set_anchor_config(my_config.node_id, ax, ay);
+
+        // Nếu ID = 0, nó là Master Anchor (Kéo theo các init phụ)
+        if (my_config.node_id == 0) {
+            master_hybrid_init();
+            master_hybrid_reset();
+            ble_scanner_init(); // Master quét BLE của Tag
+        }
+        
+        xTaskCreate(ss_responder_task_function, "UWB_RESP", configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
     }
-#else
-
-#if NODE_ID == 1
-    // TAG
-    xTaskCreate(ss_initiator_task_function, "UWB_INIT",
-                configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
-
-#elif NODE_ID == 0
-        master_hybrid_init();
-    master_hybrid_reset();
-    ble_raw_beacon_init(0);
-    ble_scanner_init();
-    xTaskCreate(ss_responder_task_function, "UWB_RESP",
-                configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
-    //xTaskCreate(ble_scan_task, "BLE_SCAN",
-    //            configMINIMAL_STACK_SIZE + 300,
-    //            NULL, 2, NULL);
-    
-
-#else
-    // ANCHOR THƯỜNG
-    xTaskCreate(ss_responder_task_function, "UWB_RESP",
-                configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
-#endif
 
     // === Bắt đầu FreeRTOS ===
     vTaskStartScheduler();
 
-    // Không bao giờ đến đây
     while (1) {}
-#endif
 }
