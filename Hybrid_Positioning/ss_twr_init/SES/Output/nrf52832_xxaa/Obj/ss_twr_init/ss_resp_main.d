@@ -71,4 +71,5 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/ss_resp_main.o: \
  ../../../nRF5_SDK_14.2.0/components/boards/boards.h \
  ../../../boards/dw1001_dev.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/util/app_error.h \
- D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_beacon.h
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_beacon.h \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_scanner.h

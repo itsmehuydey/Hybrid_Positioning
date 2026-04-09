@@ -76,8 +76,8 @@ int ble_scan_for_config(web_config_t *out_config)
 
         NRF_RADIO->TASKS_START = 1;
 
-        // Quét trong 1 khoảng thời gian
-        for (volatile int i = 0; i < 5000000; i++)
+        // Quét trong 1 khoảng thời gian RẤT NGẮN (~15ms) thay vì chờ đợi lâu
+        for (volatile int i = 0; i < 300000; i++)
         {
             if (NRF_RADIO->EVENTS_END)
             {

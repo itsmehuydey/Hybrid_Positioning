@@ -7,9 +7,12 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "ble_beacon.h"
+#include "ble_scanner.h" // THÊM HEADER BLE SCANNER
 
 // Lấy ID tự động từ cấu hình
 extern uint8_t g_current_node_id;
+extern uint16_t g_my_mac;
+extern void flash_config_write(uint8_t role, uint8_t id);
 
 float my_pos_x = 0.0f, my_pos_y = 0.0f;
 
@@ -60,6 +63,7 @@ void ss_responder_task_function(void *pvParameter) {
     tx_resp_msg[26] = g_current_node_id;
 
     TickType_t last_ble_tx = 0;
+    TickType_t last_ble_scan = 0; // Biến đánh dấu thời gian quét cấu hình
     static uint8_t anchor_seq = 0; 
 
     while (1) {
@@ -100,10 +104,27 @@ void ss_responder_task_function(void *pvParameter) {
             dwt_rxreset();
         }
 
+        TickType_t now = xTaskGetTickCount();
+
+        // ========================================================
+        // TÍNH NĂNG ĐỔI ROLE CÁCH 2: QUÉT BLE MỖI 2 GIÂY
+        // ========================================================
+        if (now - last_ble_scan > pdMS_TO_TICKS(2000)) {
+            web_config_t cfg;
+            if (ble_scan_for_config(&cfg)) {
+                if (cfg.target_mac == g_my_mac || cfg.target_mac == 0xFFFF) {
+                    printf("\r\n[ANCHOR] => NHAN LENH DOI ROLE! Role moi: %d, ID: %d\r\n", cfg.role, cfg.node_id);
+                    flash_config_write(cfg.role, cfg.node_id);
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                    NVIC_SystemReset();
+                }
+            }
+            last_ble_scan = now;
+        }
+
         // ==========================================
         // GỬI BLE ĐỊNH KỲ (MỖI 5 GIÂY) - CÓ SPAM LẶP
         // ==========================================
-        TickType_t now = xTaskGetTickCount();
         if (now - last_ble_tx > pdMS_TO_TICKS(5000)) {
             printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", 
                    g_current_node_id, my_pos_x, my_pos_y);

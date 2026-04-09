@@ -8,6 +8,7 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "ble_beacon.h"
+#include "ble_scanner.h" // THÊM HEADER BLE SCANNER
 
 // THÊM THƯ VIỆN SOLVER MỚI VÀO ĐÂY
 #include "utils.h"
@@ -18,8 +19,10 @@
 #define FREQ_OFFSET_MULTIPLIER          (998.4e6 / 2.0 / 1024.0 / 131072.0)
 #define HERTZ_TO_PPM_MULTIPLIER_CHAN_5  (-1.0e6 / 6489.6e6)
 
-// --- SỬ DỤNG BIẾN TOÀN CỤC ĐỂ LẤY ID TỪ FLASH ---
+// --- BIẾN TOÀN CỤC ĐỂ ĐỌC FLASH VÀ CẤU HÌNH ---
 extern uint8_t g_current_node_id;
+extern uint16_t g_my_mac;
+extern void flash_config_write(uint8_t role, uint8_t id);
 
 // --- TỌA ĐỘ ANCHOR CỐ ĐỊNH ---
 static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f}; 
@@ -198,6 +201,19 @@ void ss_initiator_task_function(void *pvParameter) {
 
         } else {
             printf("[!] Waiting for valid TOF data...\r\n");
+        }
+
+        // ========================================================
+        // TÍNH NĂNG ĐỔI ROLE CÁCH 2: "LIẾC" BLE ~45ms XEM CÓ LỆNH KHÔNG
+        // ========================================================
+        web_config_t cfg;
+        if (ble_scan_for_config(&cfg)) {
+            if (cfg.target_mac == g_my_mac || cfg.target_mac == 0xFFFF) {
+                printf("\r\n[TAG] => NHAN LENH DOI ROLE! Role moi: %d, ID: %d\r\n", cfg.role, cfg.node_id);
+                flash_config_write(cfg.role, cfg.node_id);
+                vTaskDelay(pdMS_TO_TICKS(100)); // Đợi tí cho Flash ghi xong
+                NVIC_SystemReset(); // Tự khởi động lại sang Role mới
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(1000)); 
