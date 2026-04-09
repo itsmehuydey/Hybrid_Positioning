@@ -8,25 +8,25 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "ble_beacon.h"
-#include "ble_scanner.h" // THÊM HEADER BLE SCANNER
+#include "ble_scanner.h"
 
-// THÊM THƯ VIỆN SOLVER MỚI VÀO ĐÂY
+// THÊM THƯ VIỆN SOLVER 3D
 #include "utils.h"
 
-#define MAX_ANCHORS 3
+#define MAX_ANCHORS 4 // Đổi thành 4 cho 3D
 #define SPEED_OF_LIGHT 299702547.0
 
 #define FREQ_OFFSET_MULTIPLIER          (998.4e6 / 2.0 / 1024.0 / 131072.0)
 #define HERTZ_TO_PPM_MULTIPLIER_CHAN_5  (-1.0e6 / 6489.6e6)
 
-// --- BIẾN TOÀN CỤC ĐỂ ĐỌC FLASH VÀ CẤU HÌNH ---
 extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
 extern void flash_config_write(uint8_t role, uint8_t id);
 
-// --- TỌA ĐỘ ANCHOR CỐ ĐỊNH ---
-static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f}; 
-static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f};
+// --- TỌA ĐỘ ANCHOR CỐ ĐỊNH (3D) ---
+static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f, 0.0f}; 
+static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f, 0.0f};
+static const float HARDCODED_ANCHOR_Z[MAX_ANCHORS] = {0.0f, 0.0f, 0.0f, 1.0f}; // Anchor 4 nâng cao lên trục Z
 
 #define CALIB_SAMPLES 10                  
 #define CALIB_TRUE_DISTANCE 1.0f          
@@ -38,14 +38,15 @@ static bool is_calibrated[MAX_ANCHORS] = {false};
 // ---------------------------------------
 
 static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
-static uint8 rx_buffer[32];
+static uint8 rx_buffer[32]; // Nới rộng buffer để bắt đủ gói tin mới của Anchor
 static uint16 g_cycle_id = 0;
 
-static vec2 g_tag_pos_est = {0.0, 0.0};
+static vec3 g_tag_pos_est = {0.0, 0.0, 0.0};
 
 typedef struct {
     float x;
     float y;
+    float z;
     float dist;
     uint32_t last_update_tick;
     bool is_valid;
@@ -59,8 +60,8 @@ void reset_uwb_state(void) {
     dwt_write32bitreg(SYS_STATUS_ID, 0xFFFFFFFF);
 }
 
-bool calculate_tag_position(float *out_x, float *out_y) {
-    vec2 valid_anchors[MAX_ANCHORS];
+bool calculate_tag_position(float *out_x, float *out_y, float *out_z) {
+    vec3 valid_anchors[MAX_ANCHORS];
     double valid_distances[MAX_ANCHORS];
     int count = 0;
 
@@ -69,18 +70,20 @@ bool calculate_tag_position(float *out_x, float *out_y) {
         if (anchors_info[i].is_valid && (current_tick - anchors_info[i].last_update_tick < pdMS_TO_TICKS(2000))) {
             valid_anchors[count].x = (double)anchors_info[i].x;
             valid_anchors[count].y = (double)anchors_info[i].y;
+            valid_anchors[count].z = (double)anchors_info[i].z;
             valid_distances[count] = (double)anchors_info[i].dist;
             count++;
         }
     }
 
-    if (count < 3) return false; 
+    if (count < 4) return false; // Yêu cầu tối thiểu 4 Anchor cho 3D
 
-    int iterations = tof_2d_localize(valid_anchors, count, valid_distances, &g_tag_pos_est);
+    int iterations = tof_3d_localize(valid_anchors, count, valid_distances, &g_tag_pos_est);
 
     if (iterations > 0) {
         *out_x = (float)g_tag_pos_est.x;
         *out_y = (float)g_tag_pos_est.y;
+        *out_z = (float)g_tag_pos_est.z;
         return true;
     }
 
@@ -88,7 +91,6 @@ bool calculate_tag_position(float *out_x, float *out_y) {
 }
 
 void ss_initiator_task_function(void *pvParameter) {
-    // Sửa để truyền ID động vào BLE
     ble_raw_beacon_init(g_current_node_id);
     printf("[TAG] SYSTEM STARTING - BACKGROUND CALIBRATION ENABLED\r\n");
     printf("[INFO] Place Tag %.2fm from Anchors for the first %d samples.\r\n\n", CALIB_TRUE_DISTANCE, CALIB_SAMPLES);
@@ -120,7 +122,7 @@ void ss_initiator_task_function(void *pvParameter) {
                 while (!((dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
                 if (dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_RXFCG) {
-                    dwt_readrxdata(rx_buffer, 30, 0); 
+                    dwt_readrxdata(rx_buffer, 32, 0); 
                     
                     if (rx_buffer[9] == 0xE1) {
                         uint32 t_round_t = dwt_readtxtimestamplo32();
@@ -152,6 +154,7 @@ void ss_initiator_task_function(void *pvParameter) {
 
                             anchors_info[a].x = HARDCODED_ANCHOR_X[a];
                             anchors_info[a].y = HARDCODED_ANCHOR_Y[a];
+                            anchors_info[a].z = HARDCODED_ANCHOR_Z[a];
                             anchors_info[a].dist = dist;
                             anchors_info[a].last_update_tick = xTaskGetTickCount();
                             anchors_info[a].is_valid = true;
@@ -162,16 +165,16 @@ void ss_initiator_task_function(void *pvParameter) {
         } 
 
         // 2. TÍNH TỌA ĐỘ VÀ ĐÓNG GÓI GỬI BLE CÓ LẶP
-        float tag_x = 0.0f, tag_y = 0.0f;
+        float tag_x = 0.0f, tag_y = 0.0f, tag_z = 0.0f;
         
-        if (calculate_tag_position(&tag_x, &tag_y)) {
+        if (calculate_tag_position(&tag_x, &tag_y, &tag_z)) {
             float d0 = anchors_info[0].is_valid ? anchors_info[0].dist : 0.0f;
             float d1 = anchors_info[1].is_valid ? anchors_info[1].dist : 0.0f;
             float d2 = anchors_info[2].is_valid ? anchors_info[2].dist : 0.0f;
+            float d3 = anchors_info[3].is_valid ? anchors_info[3].dist : 0.0f;
 
-            // Sử dụng ID động g_current_node_id cho JSON
-            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f]}\r\n", 
-                   g_current_node_id, tag_x, tag_y, d0, d1, d2);
+            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"d\":[%.2f,%.2f,%.2f,%.2f]}\r\n", 
+                   g_current_node_id, tag_x, tag_y, tag_z, d0, d1, d2, d3);
 
             #pragma pack(push, 1)
             typedef struct {
@@ -180,18 +183,18 @@ void ss_initiator_task_function(void *pvParameter) {
                 uint8_t seq;
                 float x;
                 float y;
-                float d[3];
+                float z;
+                float d[4];
             } ble_packed_data_t;
             #pragma pack(pop)
 
             ble_packed_data_t pkt;
             pkt.start_byte = '{'; 
-            pkt.id = g_current_node_id; // Sử dụng ID động
+            pkt.id = g_current_node_id;
             pkt.x = tag_x;
             pkt.y = tag_y;
-            pkt.d[0] = d0; 
-            pkt.d[1] = d1; 
-            pkt.d[2] = d2;
+            pkt.z = tag_z;
+            pkt.d[0] = d0; pkt.d[1] = d1; pkt.d[2] = d2; pkt.d[3] = d3;
 
             for(int i = 0; i < 10; i++) {
                 pkt.seq = tag_seq++;
@@ -200,19 +203,17 @@ void ss_initiator_task_function(void *pvParameter) {
             }
 
         } else {
-            printf("[!] Waiting for valid TOF data...\r\n");
+            printf("[!] Waiting for valid TOF data (Need 4 Anchors)...\r\n");
         }
 
-        // ========================================================
-        // TÍNH NĂNG ĐỔI ROLE CÁCH 2: "LIẾC" BLE ~45ms XEM CÓ LỆNH KHÔNG
         // ========================================================
         web_config_t cfg;
         if (ble_scan_for_config(&cfg)) {
             if (cfg.target_mac == g_my_mac || cfg.target_mac == 0xFFFF) {
                 printf("\r\n[TAG] => NHAN LENH DOI ROLE! Role moi: %d, ID: %d\r\n", cfg.role, cfg.node_id);
                 flash_config_write(cfg.role, cfg.node_id);
-                vTaskDelay(pdMS_TO_TICKS(100)); // Đợi tí cho Flash ghi xong
-                NVIC_SystemReset(); // Tự khởi động lại sang Role mới
+                vTaskDelay(pdMS_TO_TICKS(100)); 
+                NVIC_SystemReset();
             }
         }
 

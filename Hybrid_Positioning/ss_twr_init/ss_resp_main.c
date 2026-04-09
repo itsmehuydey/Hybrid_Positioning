@@ -7,22 +7,23 @@
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "ble_beacon.h"
-#include "ble_scanner.h" // THÊM HEADER BLE SCANNER
+#include "ble_scanner.h" 
 
-// Lấy ID tự động từ cấu hình
 extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
 extern void flash_config_write(uint8_t role, uint8_t id);
 
-float my_pos_x = 0.0f, my_pos_y = 0.0f;
+float my_pos_x = 0.0f, my_pos_y = 0.0f, my_pos_z = 0.0f;
 
-static uint8 tx_resp_msg[27] = {
+// Tăng kích thước bản tin thêm 4 byte cho Z (từ 27 lên 31 byte)
+static uint8 tx_resp_msg[31] = {
     0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, // 0-9: Header
     0, 0, 0, 0, // 10-13: TS1 (Poll RX)
     0, 0, 0, 0, // 14-17: TS2 (Resp TX)
     0, 0, 0, 0, // 18-21: Tọa độ X
     0, 0, 0, 0, // 22-25: Tọa độ Y
-    0           // 26: Anchor ID
+    0, 0, 0, 0, // 26-29: Tọa độ Z
+    0           // 30: Anchor ID
 };
 
 #define POLL_RX_TO_RESP_TX_DLY_UUS 1500 
@@ -43,27 +44,28 @@ static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts) {
 }
 
 void ss_responder_task_function(void *pvParameter) {
-    // Setup toạ độ tuỳ thuộc vào ID cấu hình động
+    // Setup toạ độ 3D tuỳ thuộc vào ID cấu hình
     if (g_current_node_id == 0) {
-        my_pos_x = 0.0f; my_pos_y = 0.0f;
+        my_pos_x = 0.0f; my_pos_y = 0.0f; my_pos_z = 0.0f;
     } else if (g_current_node_id == 1) {
-        my_pos_x = 1.0f; my_pos_y = 0.0f;
+        my_pos_x = 1.0f; my_pos_y = 0.0f; my_pos_z = 0.0f;
     } else if (g_current_node_id == 2) {
-        my_pos_x = 0.0f; my_pos_y = 1.0f;
+        my_pos_x = 0.0f; my_pos_y = 1.0f; my_pos_z = 0.0f;
     } else {
-        my_pos_x = 1.0f; my_pos_y = 1.0f; // Mặc định cho ID 3 trở lên
+        my_pos_x = 0.0f; my_pos_y = 0.0f; my_pos_z = 1.0f; // ID 3, tạo phân bố Z cho 3D
     }
 
     ble_raw_beacon_init(g_current_node_id);
-    printf("[A%d] READY. POS: (%.2f, %.2f)\r\n", g_current_node_id, my_pos_x, my_pos_y);
+    printf("[A%d] READY. POS: (%.2f, %.2f, %.2f)\r\n", g_current_node_id, my_pos_x, my_pos_y, my_pos_z);
     
-    // Nhúng sẵn tọa độ X, Y và ID vào mảng gửi qua UWB
+    // Nhúng sẵn tọa độ X, Y, Z và ID vào mảng gửi qua UWB
     memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
     memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
-    tx_resp_msg[26] = g_current_node_id;
+    memcpy(&tx_resp_msg[26], &my_pos_z, sizeof(float));
+    tx_resp_msg[30] = g_current_node_id;
 
     TickType_t last_ble_tx = 0;
-    TickType_t last_ble_scan = 0; // Biến đánh dấu thời gian quét cấu hình
+    TickType_t last_ble_scan = 0; 
     static uint8_t anchor_seq = 0; 
 
     while (1) {
@@ -107,8 +109,6 @@ void ss_responder_task_function(void *pvParameter) {
         TickType_t now = xTaskGetTickCount();
 
         // ========================================================
-        // TÍNH NĂNG ĐỔI ROLE CÁCH 2: QUÉT BLE MỖI 2 GIÂY
-        // ========================================================
         if (now - last_ble_scan > pdMS_TO_TICKS(2000)) {
             web_config_t cfg;
             if (ble_scan_for_config(&cfg)) {
@@ -123,11 +123,9 @@ void ss_responder_task_function(void *pvParameter) {
         }
 
         // ==========================================
-        // GỬI BLE ĐỊNH KỲ (MỖI 5 GIÂY) - CÓ SPAM LẶP
-        // ==========================================
         if (now - last_ble_tx > pdMS_TO_TICKS(5000)) {
-            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", 
-                   g_current_node_id, my_pos_x, my_pos_y);
+            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"role\":\"anchor\"}\r\n", 
+                   g_current_node_id, my_pos_x, my_pos_y, my_pos_z);
 
             #pragma pack(push, 1)
             typedef struct {
@@ -136,6 +134,7 @@ void ss_responder_task_function(void *pvParameter) {
                 uint8_t seq;
                 float x;
                 float y;
+                float z;
             } ble_anchor_packed_t;
             #pragma pack(pop)
 
@@ -144,6 +143,7 @@ void ss_responder_task_function(void *pvParameter) {
             pkt.id = g_current_node_id;
             pkt.x = my_pos_x;
             pkt.y = my_pos_y;
+            pkt.z = my_pos_z;
 
             for(int i = 0; i < 10; i++) {
                 pkt.seq = anchor_seq++;
