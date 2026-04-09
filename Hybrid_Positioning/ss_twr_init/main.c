@@ -13,10 +13,8 @@
 #include "nrf_delay.h"
 #include "nrf_log.h"
 #include "nrf.h"
-#include "app_error.h"
-#include "app_util_platform.h"
-#include "app_error.h"
 #include <string.h>
+#include <stdio.h>
 #include "port_platform.h"
 #include "deca_types.h"
 #include "deca_param_types.h"
@@ -27,26 +25,35 @@
 #include "ble_beacon.h"
 #include "ble_scanner.h"
 #include "ble_hybrid.h"
+
 //#define SIMULATION_MODE
 #include "simulation.c"
 
-#ifndef NODE_ID
-#define NODE_ID 1
-#warning "NODE_ID not defined, defaulting to 1 (Tag)"
-#endif
+// ===============================================================
+// THÊM: BIẾN TOÀN CỤC CHO ROLE ĐỘNG & LƯU FLASH
+// ===============================================================
+uint8_t g_current_role = 0;
+uint8_t g_current_node_id = 0;
+uint16_t g_my_mac = 0;
 
+#define CONFIG_FLASH_ADDR 0x0007E000 // Sử dụng Page 126 ở cuối bộ nhớ Flash
 
-// Tọa độ các anchor (chỉ dùng cho Tag)
-#if NODE_ID == 1
-//vec3 anc[N_ANCHORS] = {
-//    {0.0, 0.0, 2.5},  
-//    {2.0, 0.0, 2.5},
-//    {2.0, 1.0, 2.5},
-//    {0.0, 1.0, 2.5}
-//};
-
-//vec3 pos_est = {0, 0, 1.0}; 
-#endif
+void flash_config_write(uint8_t role, uint8_t id) {
+    NRF_NVMC->CONFIG = 2; // Bật chế độ XÓA (ERASE)
+    NRF_NVMC->ERASEPAGE = CONFIG_FLASH_ADDR;
+    while(NRF_NVMC->READY == 0);
+    
+    NRF_NVMC->CONFIG = 1; // Bật chế độ GHI (WRITE)
+    uint32_t magic_word = 0xDEADBEEF;
+    uint32_t config_data = (id << 8) | role;
+    
+    ((uint32_t*)CONFIG_FLASH_ADDR)[0] = magic_word;
+    ((uint32_t*)CONFIG_FLASH_ADDR)[1] = config_data;
+    while(NRF_NVMC->READY == 0);
+    
+    NRF_NVMC->CONFIG = 0; // Trả về chế độ ĐỌC (READ)
+}
+// ===============================================================
 
 // Cấu hình DW1000
 static dwt_config_t config = {
@@ -74,7 +81,6 @@ TaskHandle_t led_task_handle = NULL;
 TaskHandle_t uwb_task_handle = NULL;
 TimerHandle_t led_timer_handle = NULL;
 
-// Hàm LED nhấp nháy
 static void led_toggle_task_function(void *pvParameter)
 {
     UNUSED_PARAMETER(pvParameter);
@@ -91,39 +97,74 @@ static void led_toggle_timer_callback(void *pvParameter)
     LEDS_INVERT(BSP_LED_1_MASK);
 }
 
-// Forward declarations
 extern void ss_initiator_task_function(void *pvParameter);
 extern void ss_responder_task_function(void *pvParameter);
 
-
-
 int main(void)
 {
-
     // === Khởi tạo LED ===
     LEDS_CONFIGURE(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
     LEDS_ON(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
+
+    // === TẠO MAC & ĐỌC FLASH TÌM CẤU HÌNH ===
+    g_my_mac = (uint16_t)(NRF_FICR->DEVICEADDR[0] & 0xFFFF);
+    uint32_t *flash_ptr = (uint32_t*)CONFIG_FLASH_ADDR;
+
+    if (flash_ptr[0] == 0xDEADBEEF) {
+        g_current_role = (uint8_t)(flash_ptr[1] & 0xFF);
+        g_current_node_id = (uint8_t)((flash_ptr[1] >> 8) & 0xFF);
+    }
+
+    printf("\r\n=== UWB Hybrid Localization System ===\r\n");
+    
+    // === CHỜ CẤU HÌNH BLE ===
+    ble_raw_beacon_init(0);
+    ble_scanner_init();
+
+    uint32_t config_timeout = (g_current_role == 0) ? 0xFFFFFFFF : 5; // Vô hạn nếu chưa có role, 5 nhịp (vài giây) nếu đã có
+    uint8_t scan_buf[64];
+    uint16_t scan_len;
+    
+    if (g_current_role == 0) {
+        printf("Chua co Role! Phat BLE MAC: %04X va cho lenh...\r\n", g_my_mac);
+    } else {
+        printf("Da co Role: %d, ID: %d (MAC: %04X). Cho 3s xem co doi Role khong...\r\n", g_current_role, g_current_node_id, g_my_mac);
+    }
+
+    while (config_timeout > 0) {
+        if (g_current_role == 0) {
+            // Phát JSON chứa MAC và Role 0 cho máy tính nhận diện
+            char json_mac[30];
+            snprintf(json_mac, sizeof(json_mac), "{\"mac\":%u,\"role\":0}", g_my_mac);
+            ble_raw_beacon_send_payload((uint8_t*)json_mac, strlen(json_mac));
+        }
+
+        if (ble_scan_packet(scan_buf, &scan_len)) {
+            // Kiểm tra format từ Python: 0x43 (Header) + MAC (2 byte) + Role (1) + ID (1)
+            if (scan_len >= 5 && scan_buf[0] == 0x43) {
+                uint16_t target_mac;
+                memcpy(&target_mac, &scan_buf[1], 2);
+                
+                if (target_mac == g_my_mac) {
+                    uint8_t new_role = scan_buf[3];
+                    uint8_t new_id = scan_buf[4];
+                    printf("\r\n=> NHAN LENH DOI ROLE! Role moi: %d, ID: %d. Resetting...\r\n", new_role, new_id);
+                    flash_config_write(new_role, new_id);
+                    nrf_delay_ms(500);
+                    NVIC_SystemReset();
+                }
+            }
+        }
+        if (g_current_role != 0) config_timeout--;
+    }
+
+    // === IN RA VAI TRÒ CHÍNH THỨC ===
+    printf("Role hien tai chay: Role %d, Node ID: %d\r\n", g_current_role, g_current_node_id);
 
     // === Tạo task LED ===
     xTaskCreate(led_toggle_task_function, "LED0", configMINIMAL_STACK_SIZE + 200, NULL, 2, &led_task_handle);
     led_timer_handle = xTimerCreate("LED1", TIMER_PERIOD, pdTRUE, NULL, led_toggle_timer_callback);
     xTimerStart(led_timer_handle, 0);
-
-    // === Cấu hình UART ===
-   // boUART_Init();
-
-    printf("\r\n=== UWB Hybrid Localization System ===\r\n");
-    printf("Node ID: %d ", NODE_ID);
-
-#if NODE_ID == 1
-    printf("(TAG - Initiator)\r\n");
-
-#elif NODE_ID == 0
-    printf("(MASTER ANCHOR)\r\n");
-
-#else
-    printf("(ANCHOR SLAVE %d)\r\n", NODE_ID - 2);
-#endif
 
     // === Cấu hình ngắt DW1000 ===
     nrf_gpio_cfg_input(DW1000_IRQ, NRF_GPIO_PIN_NOPULL);
@@ -135,7 +176,7 @@ int main(void)
     if (dwt_initialise(DWT_LOADUCODE) == DWT_ERROR)
     {
         printf("ERROR: DW1000 init failed!\r\n");
-        while (1) { LEDS_INVERT(BSP_LED_2_MASK); vTaskDelay(100); }
+        while (1) { LEDS_INVERT(BSP_LED_2_MASK); nrf_delay_ms(100); }
     }
 
     port_set_dw1000_fastrate();
@@ -153,28 +194,15 @@ int main(void)
     }
 #else
 
-#if NODE_ID == 1
-    // TAG
-    xTaskCreate(ss_initiator_task_function, "UWB_INIT",
-                configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
-
-#elif NODE_ID == 0
-        master_hybrid_init();
-    master_hybrid_reset();
-    ble_raw_beacon_init(0);
-    ble_scanner_init();
-    xTaskCreate(ss_responder_task_function, "UWB_RESP",
-                configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
-    //xTaskCreate(ble_scan_task, "BLE_SCAN",
-    //            configMINIMAL_STACK_SIZE + 300,
-    //            NULL, 2, NULL);
-    
-
-#else
-    // ANCHOR THƯỜNG
-    xTaskCreate(ss_responder_task_function, "UWB_RESP",
-                configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
-#endif
+    // Dựa vào ROLE động để chạy Task
+    if (g_current_role == 1) { // ROLE 1 = TAG
+        xTaskCreate(ss_initiator_task_function, "UWB_INIT",
+                    configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
+    } 
+    else if (g_current_role == 2) { // ROLE 2 = ANCHOR
+        xTaskCreate(ss_responder_task_function, "UWB_RESP",
+                    configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
+    }
 
     // === Bắt đầu FreeRTOS ===
     vTaskStartScheduler();

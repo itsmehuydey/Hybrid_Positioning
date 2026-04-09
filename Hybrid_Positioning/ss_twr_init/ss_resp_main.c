@@ -6,26 +6,13 @@
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
-#include "ble_beacon.h" // Kéo thư viện BLE vào
+#include "ble_beacon.h"
 
-// Thay đổi NODE_ID (0, 1, 2, 3) tương ứng với từng mạch Anchor khi nạp code
-#ifndef NODE_ID
-#define NODE_ID 2
-#endif
-#define MY_ANCHOR_ID NODE_ID
+// Lấy ID tự động từ cấu hình
+extern uint8_t g_current_node_id;
 
-// Cấu hình tọa độ (mét) tương ứng với từng Anchor ID
-#if MY_ANCHOR_ID == 0
-    float my_pos_x = 0.0f, my_pos_y = 0.0f;
-#elif MY_ANCHOR_ID == 1
-    float my_pos_x = 1.0f, my_pos_y = 0.0f;
-#elif MY_ANCHOR_ID == 2
-    float my_pos_x = 0.0f, my_pos_y = 1.0f;
-#else
-    float my_pos_x = 1.0f, my_pos_y = 1.0f;
-#endif
+float my_pos_x = 0.0f, my_pos_y = 0.0f;
 
-/* Chiều dài mảng 27 byte chứa X, Y (byte 18-25) và Anchor ID (byte 26) */
 static uint8 tx_resp_msg[27] = {
     0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, // 0-9: Header
     0, 0, 0, 0, // 10-13: TS1 (Poll RX)
@@ -53,25 +40,33 @@ static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts) {
 }
 
 void ss_responder_task_function(void *pvParameter) {
-    // Khởi tạo BLE cho Anchor
-    ble_raw_beacon_init(MY_ANCHOR_ID);
-    printf("[A%d] READY. POS: (%.2f, %.2f)\r\n", MY_ANCHOR_ID, my_pos_x, my_pos_y);
+    // Setup toạ độ tuỳ thuộc vào ID cấu hình động
+    if (g_current_node_id == 0) {
+        my_pos_x = 0.0f; my_pos_y = 0.0f;
+    } else if (g_current_node_id == 1) {
+        my_pos_x = 1.0f; my_pos_y = 0.0f;
+    } else if (g_current_node_id == 2) {
+        my_pos_x = 0.0f; my_pos_y = 1.0f;
+    } else {
+        my_pos_x = 1.0f; my_pos_y = 1.0f; // Mặc định cho ID 3 trở lên
+    }
+
+    ble_raw_beacon_init(g_current_node_id);
+    printf("[A%d] READY. POS: (%.2f, %.2f)\r\n", g_current_node_id, my_pos_x, my_pos_y);
     
     // Nhúng sẵn tọa độ X, Y và ID vào mảng gửi qua UWB
     memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
     memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
-    tx_resp_msg[26] = (uint8)MY_ANCHOR_ID;
+    tx_resp_msg[26] = g_current_node_id;
 
     TickType_t last_ble_tx = 0;
-    static uint8_t anchor_seq = 0; // Bộ đếm BLE cho Anchor
+    static uint8_t anchor_seq = 0; 
 
     while (1) {
-        // Đặt timeout 65000 symbols (~65ms) để vòng lặp không bị kẹt chết ở UWB RX
         dwt_setrxtimeout(65000);
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-        // Chờ nhận được khung UWB hoặc hết thời gian timeout (65ms)
         while (!(dwt_read32bitreg(SYS_STATUS_ID) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
         uint32 status = dwt_read32bitreg(SYS_STATUS_ID);
@@ -81,7 +76,7 @@ void ss_responder_task_function(void *pvParameter) {
                 dwt_readrxdata(rx_buffer, frame_len, 0);
             }
 
-            if (rx_buffer[9] == 0xE0 && rx_buffer[10] == (uint8)MY_ANCHOR_ID) {
+            if (rx_buffer[9] == 0xE0 && rx_buffer[10] == g_current_node_id) {
                 uint64 poll_rx_ts = get_rx_timestamp_u64();
                 uint32 resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
                 dwt_setdelayedtrxtime(resp_tx_time);
@@ -106,15 +101,13 @@ void ss_responder_task_function(void *pvParameter) {
         }
 
         // ==========================================
-        // GỬI BLE ĐỊNH KỲ (MỖI 2 GIÂY) - CÓ SPAM LẶP
+        // GỬI BLE ĐỊNH KỲ (MỖI 5 GIÂY) - CÓ SPAM LẶP
         // ==========================================
         TickType_t now = xTaskGetTickCount();
         if (now - last_ble_tx > pdMS_TO_TICKS(5000)) {
-            // In ra UART dạng JSON
             printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", 
-                   MY_ANCHOR_ID, my_pos_x, my_pos_y);
+                   g_current_node_id, my_pos_x, my_pos_y);
 
-            // Đóng gói nhị phân (11 byte)
             #pragma pack(push, 1)
             typedef struct {
                 uint8_t start_byte; 
@@ -126,12 +119,11 @@ void ss_responder_task_function(void *pvParameter) {
             #pragma pack(pop)
 
             ble_anchor_packed_t pkt;
-            pkt.start_byte = '[';  // Mã ASCII '[' để nhận diện là Anchor
-            pkt.id = MY_ANCHOR_ID;
+            pkt.start_byte = '['; 
+            pkt.id = g_current_node_id;
             pkt.x = my_pos_x;
             pkt.y = my_pos_y;
 
-            // Bắn lặp lại 10 lần để chắc chắn máy tính bắt được
             for(int i = 0; i < 10; i++) {
                 pkt.seq = anchor_seq++;
                 ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));

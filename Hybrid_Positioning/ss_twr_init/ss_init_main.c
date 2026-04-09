@@ -18,13 +18,12 @@
 #define FREQ_OFFSET_MULTIPLIER          (998.4e6 / 2.0 / 1024.0 / 131072.0)
 #define HERTZ_TO_PPM_MULTIPLIER_CHAN_5  (-1.0e6 / 6489.6e6)
 
-// --- ID CỦA TAG HIỆN TẠI ---
-#define TAG_ID 1
+// --- SỬ DỤNG BIẾN TOÀN CỤC ĐỂ LẤY ID TỪ FLASH ---
+extern uint8_t g_current_node_id;
 
 // --- TỌA ĐỘ ANCHOR CỐ ĐỊNH ---
 static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f}; 
 static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f};
-
 
 #define CALIB_SAMPLES 10                  
 #define CALIB_TRUE_DISTANCE 1.0f          
@@ -86,7 +85,8 @@ bool calculate_tag_position(float *out_x, float *out_y) {
 }
 
 void ss_initiator_task_function(void *pvParameter) {
-    ble_raw_beacon_init(TAG_ID);
+    // Sửa để truyền ID động vào BLE
+    ble_raw_beacon_init(g_current_node_id);
     printf("[TAG] SYSTEM STARTING - BACKGROUND CALIBRATION ENABLED\r\n");
     printf("[INFO] Place Tag %.2fm from Anchors for the first %d samples.\r\n\n", CALIB_TRUE_DISTANCE, CALIB_SAMPLES);
 
@@ -95,14 +95,12 @@ void ss_initiator_task_function(void *pvParameter) {
         anchors_info[i].last_update_tick = 0;
     }
 
-    static uint8_t tag_seq = 0; // Bộ đếm BLE cho Tag
+    static uint8_t tag_seq = 0; 
 
     while (1) {
         g_cycle_id++;
         
-        // ==========================================
         // 1. QUÁ TRÌNH UWB ĐO KHOẢNG CÁCH
-        // ==========================================
         for (int a = 0; a < MAX_ANCHORS; a++) {
             reset_uwb_state(); 
             vTaskDelay(pdMS_TO_TICKS(5)); 
@@ -135,7 +133,6 @@ void ss_initiator_task_function(void *pvParameter) {
                         float raw_dist = (float)(tof * DWT_TIME_UNITS * SPEED_OF_LIGHT);
 
                         if (raw_dist > 0.05f && raw_dist < 100.0f) {
-                            
                             if (!is_calibrated[a]) {
                                 calib_sum[a] += raw_dist;
                                 calib_count[a]++;
@@ -161,22 +158,18 @@ void ss_initiator_task_function(void *pvParameter) {
             }
         } 
 
-        // ==========================================
         // 2. TÍNH TỌA ĐỘ VÀ ĐÓNG GÓI GỬI BLE CÓ LẶP
-        // ==========================================
         float tag_x = 0.0f, tag_y = 0.0f;
         
         if (calculate_tag_position(&tag_x, &tag_y)) {
-            // Lấy khoảng cách của 3 anchor đầu tiên (nếu có)
             float d0 = anchors_info[0].is_valid ? anchors_info[0].dist : 0.0f;
             float d1 = anchors_info[1].is_valid ? anchors_info[1].dist : 0.0f;
             float d2 = anchors_info[2].is_valid ? anchors_info[2].dist : 0.0f;
 
-            // In JSON ra màn hình Serial (UART) để bạn theo dõi trực tiếp qua cáp
+            // Sử dụng ID động g_current_node_id cho JSON
             printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f]}\r\n", 
-                   TAG_ID, tag_x, tag_y, d0, d1, d2);
+                   g_current_node_id, tag_x, tag_y, d0, d1, d2);
 
-            // Cấu trúc ép sát bộ nhớ (Packed Struct) để gửi BLE siêu nhẹ (23 Bytes)
             #pragma pack(push, 1)
             typedef struct {
                 uint8_t start_byte; 
@@ -189,15 +182,14 @@ void ss_initiator_task_function(void *pvParameter) {
             #pragma pack(pop)
 
             ble_packed_data_t pkt;
-            pkt.start_byte = '{';  // Ký hiệu nhận diện cho code Python
-            pkt.id = TAG_ID;
+            pkt.start_byte = '{'; 
+            pkt.id = g_current_node_id; // Sử dụng ID động
             pkt.x = tag_x;
             pkt.y = tag_y;
             pkt.d[0] = d0; 
             pkt.d[1] = d1; 
             pkt.d[2] = d2;
 
-            // Bắn lặp lại 10 lần để chắc chắn máy tính bắt được
             for(int i = 0; i < 10; i++) {
                 pkt.seq = tag_seq++;
                 ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
