@@ -1,14 +1,19 @@
+// ==========================================
+// FILE: ss_resp_main.c
+// ==========================================
 #include "sdk_config.h"
 #include <stdio.h>
 #include <string.h>
 #include "FreeRTOS.h"
 #include "task.h"
+#include "semphr.h"
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
 #include "ble_beacon.h" 
 
-// --- THAY ĐỔI: Biến trạng thái động ---
+extern SemaphoreHandle_t radio_mutex;
+
 uint8_t MY_ANCHOR_ID = 0;
 float my_pos_x = 0.0f;
 float my_pos_y = 0.0f;
@@ -18,15 +23,10 @@ void set_anchor_config(uint8_t id, float x, float y) {
     my_pos_x = x;
     my_pos_y = y;
 }
-// -------------------------------------
 
 static uint8 tx_resp_msg[27] = {
-    0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, // 0-9: Header
-    0, 0, 0, 0, // 10-13: TS1 
-    0, 0, 0, 0, // 14-17: TS2 
-    0, 0, 0, 0, // 18-21: Tọa độ X
-    0, 0, 0, 0, // 22-25: Tọa độ Y
-    0           // 26: Anchor ID
+    0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0           
 };
 
 #define POLL_RX_TO_RESP_TX_DLY_UUS 1500 
@@ -47,10 +47,8 @@ static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts) {
 }
 
 void ss_responder_task_function(void *pvParameter) {
-    ble_raw_beacon_init(MY_ANCHOR_ID);
     printf("[A%d] READY. POS: (%.2f, %.2f)\r\n", MY_ANCHOR_ID, my_pos_x, my_pos_y);
     
-    // Nhúng cấu hình vào gói tin UWB
     memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
     memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
     tx_resp_msg[26] = (uint8)MY_ANCHOR_ID;
@@ -89,38 +87,30 @@ void ss_responder_task_function(void *pvParameter) {
                     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
                     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
                 }
-            } else {
-                dwt_rxreset();
-            }
-        } else {
-            dwt_rxreset();
-        }
+            } else { dwt_rxreset(); }
+        } else { dwt_rxreset(); }
 
         TickType_t now = xTaskGetTickCount();
         if (now - last_ble_tx > pdMS_TO_TICKS(15000)) {
-            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", 
-                   MY_ANCHOR_ID, my_pos_x, my_pos_y);
+            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"role\":\"anchor\"}\r\n", MY_ANCHOR_ID, my_pos_x, my_pos_y);
 
             #pragma pack(push, 1)
             typedef struct {
-                uint8_t start_byte; 
-                uint8_t id;
-                uint8_t seq;
-                float x;
-                float y;
+                uint8_t start_byte; uint8_t id; uint8_t seq; float x; float y;
             } ble_anchor_packed_t;
             #pragma pack(pop)
 
             ble_anchor_packed_t pkt;
-            pkt.start_byte = '[';  
-            pkt.id = MY_ANCHOR_ID;
-            pkt.x = my_pos_x;
-            pkt.y = my_pos_y;
+            pkt.start_byte = '['; pkt.id = MY_ANCHOR_ID; pkt.x = my_pos_x; pkt.y = my_pos_y;
 
-            for(int i = 0; i < 10; i++) {
-                pkt.seq = anchor_seq++;
-                ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
-                vTaskDelay(pdMS_TO_TICKS(15));
+            if (xSemaphoreTake(radio_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                ble_raw_beacon_init(MY_ANCHOR_ID);
+                for(int i = 0; i < 10; i++) {
+                    pkt.seq = anchor_seq++;
+                    ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+                    vTaskDelay(pdMS_TO_TICKS(15));
+                }
+                xSemaphoreGive(radio_mutex);
             }
 
             last_ble_tx = now;
