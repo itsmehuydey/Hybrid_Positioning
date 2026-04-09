@@ -48,8 +48,6 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/main.o: \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/list.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/timers.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/task.h \
- ../../../nRF5_SDK_14.2.0/external/freertos/source/include/semphr.h \
- ../../../nRF5_SDK_14.2.0/external/freertos/source/include/queue.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/bsp/bsp.h \
  ../../../nRF5_SDK_14.2.0/components/boards/boards.h \
  ../../../nRF5_SDK_14.2.0/components/drivers_nrf/hal/nrf_gpio.h \
@@ -75,9 +73,10 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/main.o: \
  ../../../nRF5_SDK_14.2.0/components/libraries/experimental_log/nrf_log.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/experimental_section_vars/nrf_section.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/experimental_log/src/nrf_log_internal.h \
- ../../../nRF5_SDK_14.2.0/components/libraries/util/app_error.h \
  ../../../deca_driver/port/port_platform.h \
- ../../../deca_driver/deca_types.h ../../../deca_driver/deca_device_api.h \
+ ../../../deca_driver/deca_types.h \
+ ../../../nRF5_SDK_14.2.0/components/libraries/util/app_error.h \
+ ../../../deca_driver/deca_device_api.h \
  ../../../deca_driver/deca_param_types.h \
  ../../../deca_driver/deca_types.h ../../../deca_driver/deca_regs.h \
  ../../../deca_driver/deca_version.h ../UART/uart.h \
@@ -85,4 +84,5 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/main.o: \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_beacon.h \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_scanner.h \
  D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_hybrid.h \
- D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_tdoa_report.h
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_tdoa_report.h \
+ D:\TN\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\simulation.c

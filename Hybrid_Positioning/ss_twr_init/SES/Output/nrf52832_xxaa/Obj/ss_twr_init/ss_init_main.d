@@ -47,8 +47,6 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/mpu_wrappers.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/task.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/list.h \
- ../../../nRF5_SDK_14.2.0/external/freertos/source/include/semphr.h \
- ../../../nRF5_SDK_14.2.0/external/freertos/source/include/queue.h \
  ../../../deca_driver/deca_device_api.h ../../../deca_driver/deca_regs.h \
  ../../../deca_driver/deca_version.h \
  ../../../deca_driver/port/port_platform.h \
