@@ -16,5 +16,6 @@ void ble_raw_beacon_init(uint8_t dev_id);
 void ble_raw_beacon_broadcast(void);
 
 void ble_raw_beacon_send_payload(const uint8_t *data, uint8_t len);
+void ble_beacon_send_geometry(uint8_t target_id, float x, float y, float z);
 
 #endif

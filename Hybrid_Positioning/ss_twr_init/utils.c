@@ -160,3 +160,38 @@ int tof_3d_localize(const vec3 anc[], int num_anchors,
 
     return 1;
 }
+
+
+int calculate_anchor_geometry(double d01, double d02, double d03,
+                              double d12, double d13, double d23,
+                              vec3 *a1, vec3 *a2, vec3 *a3)
+{
+    if (d01 <= 0 || d02 <= 0 || d03 <= 0 || d12 <= 0 || d13 <= 0 || d23 <= 0) return 0;
+
+    // 1. Tính A1 (Nằm trên trục X dương)
+    a1->x = d01;
+    a1->y = 0.0;
+    a1->z = 0.0;
+
+    // 2. Tính A2 (Nằm trên mặt phẳng XY)
+    // Áp dụng định lý hàm số Cosin cho tam giác A0-A1-A2
+    a2->x = (d02 * d02 + d01 * d01 - d12 * d12) / (2.0 * d01);
+    
+    double y2_sq = d02 * d02 - (a2->x * a2->x);
+    if (y2_sq < 0) y2_sq = 0.0; // Tránh lỗi số học do nhiễu UWB
+    a2->y = sqrt(y2_sq);
+    a2->z = 0.0;
+
+    // 3. Tính A3 (Không gian 3D)
+    a3->x = (d03 * d03 + d01 * d01 - d13 * d13) / (2.0 * d01);
+
+    if (a2->y < 1e-6) return 0; // Tránh chia cho 0 nếu A0, A1, A2 thẳng hàng
+
+    a3->y = (d02 * d02 + d03 * d03 - d23 * d23 - 2.0 * a3->x * a2->x) / (2.0 * a2->y);
+
+    double z3_sq = d03 * d03 - (a3->x * a3->x) - (a3->y * a3->y);
+    if (z3_sq < 0) z3_sq = 0.0;
+    a3->z = sqrt(z3_sq); // Lấy phần dương, giả định A3 được treo trên cao so với mặt phẳng
+
+    return 1;
+}

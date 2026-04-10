@@ -32,6 +32,10 @@ int tof_3d_localize(const vec3 anc[], int num_anchors,
                     const double distances[],
                     vec3 *pos_est);
 
+int calculate_anchor_geometry(double d01, double d02, double d03,
+                              double d12, double d13, double d23,
+                              vec3 *a1, vec3 *a2, vec3 *a3);
+
 #ifdef __cplusplus
 }
 #endif

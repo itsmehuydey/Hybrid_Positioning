@@ -29,5 +29,6 @@ int ble_scan_for_config(web_config_t *out_config);
  * @brief Hàm quét gói tin thông thường (Giữ nguyên gốc)
  */
 int ble_scan_packet(uint8_t *out, uint16_t *out_len);
+int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y, float *out_z);
 
 #endif

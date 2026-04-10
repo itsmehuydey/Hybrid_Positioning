@@ -184,3 +184,74 @@ int ble_scan_packet(uint8_t *out, uint16_t *out_len)
     }
     return 0;
 }
+
+int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y, float *out_z)
+{
+    for (uint8_t ch = 0; ch < 3; ch++)
+    {
+        NRF_RADIO->FREQUENCY   = ble_freqs[ch];
+        NRF_RADIO->DATAWHITEIV = ble_ch_idx[ch];
+        NRF_RADIO->PACKETPTR   = (uint32_t)scan_buf;
+
+        NRF_RADIO->EVENTS_READY = 0;
+        NRF_RADIO->EVENTS_END   = 0;
+
+        NRF_RADIO->TASKS_RXEN = 1;
+        for (volatile int t = 0; t < 20000; t++) {
+            if (NRF_RADIO->EVENTS_READY) break;
+        }
+
+        if (!NRF_RADIO->EVENTS_READY) {
+            NRF_RADIO->TASKS_DISABLE = 1;
+            continue;
+        }
+
+        NRF_RADIO->TASKS_START = 1;
+
+        // Quét ngắn hạn để không block Anchor quá lâu
+        for (volatile int i = 0; i < 300000; i++)
+        {
+            if (NRF_RADIO->EVENTS_END)
+            {
+                NRF_RADIO->EVENTS_END = 0;
+                uint8_t pdu_len = scan_buf[1];
+
+                if (pdu_len >= 6) {
+                    uint8_t *p = scan_buf + 8;
+                    uint8_t remain = pdu_len - 6;
+
+                    while (remain > 0)
+                    {
+                        uint8_t fl = p[0];
+                        if (fl == 0 || fl + 1 > remain) break;
+
+                        // Tìm Manufacturer Data (0xFF) và Nordic CID (0x0059)
+                        if (p[1] == 0xFF && p[2] == (TARGET_CID & 0xFF) && p[3] == (TARGET_CID >> 8))
+                        {
+                            uint8_t payload_len = fl - 3;
+
+                            // magic(1) + id(1) + x(4) + y(4) + z(4) = 14 bytes
+                            if (payload_len >= 14) { 
+                                uint8_t magic = p[4];
+                                uint8_t target_id = p[5];
+
+                                if (magic == 'G' && target_id == my_id) {
+                                    memcpy(out_x, &p[6], 4);
+                                    memcpy(out_y, &p[10], 4);
+                                    memcpy(out_z, &p[14], 4);
+                                    NRF_RADIO->TASKS_DISABLE = 1;
+                                    return 1; // Nhận thành công
+                                }
+                            }
+                        }
+                        remain -= (fl + 1);
+                        p += (fl + 1);
+                    }
+                }
+                break;
+            }
+        }
+        NRF_RADIO->TASKS_DISABLE = 1;
+    }
+    return 0;
+}
