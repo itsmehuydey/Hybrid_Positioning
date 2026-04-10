@@ -19,7 +19,8 @@
 extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
 extern uint8_t g_current_role; 
-extern void flash_config_write(uint8_t role, uint8_t id);
+// Cập nhật tham số truyền vào của hàm Flash
+extern void flash_config_write(uint8_t role, uint8_t id, float x, float y, float z);
 
 static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f, 0.0f}; 
 static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f, 0.0f};
@@ -128,7 +129,6 @@ void ss_initiator_task_function(void *pvParameter) {
                     last_wait_log = xTaskGetTickCount();
                 }
 
-                // FIX BỌC THÉP: Xóa cờ Timeout cũ để tránh bị mù vô tuyến
                 reset_uwb_state(); 
                 dwt_setrxtimeout(65000);
                 dwt_rxenable(DWT_START_RX_IMMEDIATE);
@@ -152,7 +152,8 @@ void ss_initiator_task_function(void *pvParameter) {
 
             if (g_current_role == 99) {
                 printf("[TAG] CALIBRATION FINISHED. REVERTING FLASH TO ROLE 1 AND RESETTING...\r\n");
-                flash_config_write(1, g_current_node_id);
+                // Ghi đè Role về 1, tọa độ của Tag thì set mặc định 0,0,0
+                flash_config_write(1, g_current_node_id, 0.0f, 0.0f, 0.0f);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 NVIC_SystemReset();
             }
@@ -269,7 +270,7 @@ void ss_initiator_task_function(void *pvParameter) {
                     }
                     g_is_calibrating = true;
                 } else {
-                    flash_config_write(cfg.role, cfg.node_id);
+                    flash_config_write(cfg.role, cfg.node_id, 0.0f, 0.0f, 0.0f);
                     vTaskDelay(pdMS_TO_TICKS(100)); 
                     NVIC_SystemReset();
                 }
