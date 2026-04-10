@@ -194,8 +194,8 @@ int main(void)
     }
 #else
 
-    // Dựa vào ROLE động để chạy Task
-    if (g_current_role == 1) { // ROLE 1 = TAG
+    // SỬA Ở ĐÂY: Dựa vào ROLE động để chạy Task. Cho phép Role 99 chạy task của Tag
+    if (g_current_role == 1 || g_current_role == 99) { // ROLE 1 = TAG HOẶC ROLE 99 = CALIB
         xTaskCreate(ss_initiator_task_function, "UWB_INIT",
                     configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
     } 

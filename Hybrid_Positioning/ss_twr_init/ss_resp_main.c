@@ -29,6 +29,46 @@ static uint8_t tx_resp_msg[31] = {
 
 static uint8_t rx_buffer[64];
 
+static float safe_measure_tof(uint8_t target, uint8_t my_id) {
+    float d = 0.0f;
+    for (int i = 0; i < 5; i++) { 
+        d = measure_inter_anchor_tof(target);
+        if (d > 0.05f && d < 100.0f) {
+            return d; 
+        }
+        printf("[A%d] UWB miss to A%d. Retrying (%d/5)...\r\n", my_id, target, i+1);
+        vTaskDelay(pdMS_TO_TICKS(50)); 
+    }
+    return 0.0f; 
+}
+
+static void robust_ble_blast_distances(uint8_t my_id, uint8_t t1, float d1, uint8_t t2, float d2) {
+    printf("[A%d] Blasting BLE dists (d%d%d=%.2f, d%d%d=%.2f) for 2.5s...\r\n", 
+           my_id, my_id, t1, d1, my_id, t2, d2);
+    
+    TickType_t start = xTaskGetTickCount();
+    uint8_t payload[7];
+    payload[0] = 'D'; 
+    payload[1] = my_id;
+    
+    while (xTaskGetTickCount() - start < pdMS_TO_TICKS(2500)) {
+        if (d1 > 0.05f) {
+            payload[2] = t1; memcpy(&payload[3], &d1, 4);
+            ble_raw_beacon_send_payload(payload, 7);
+            vTaskDelay(pdMS_TO_TICKS(15));
+        }
+        if (d2 > 0.05f) {
+            payload[2] = t2; memcpy(&payload[3], &d2, 4);
+            ble_raw_beacon_send_payload(payload, 7);
+            vTaskDelay(pdMS_TO_TICKS(15));
+        }
+        if (d1 <= 0.05f && d2 <= 0.05f) { 
+            vTaskDelay(pdMS_TO_TICKS(100));
+        }
+    }
+    printf("[A%d] Done blasting BLE.\r\n", my_id);
+}
+
 void ss_responder_task_function(void *pvParameter) {
     if (g_current_node_id == 0) {
         my_pos_x = 0.0f; my_pos_y = 0.0f; my_pos_z = 0.0f;
@@ -55,80 +95,150 @@ void ss_responder_task_function(void *pvParameter) {
 
     while (1) {
         if (g_is_calibrating) {
-            printf("[ANCHOR %d] ENTER CALIBRATION\r\n", g_current_node_id);
-            printf("[ANCHOR %d] STATUS: CALIBRATING MODE\r\n", g_current_node_id);
+            printf("\r\n[A%d] >>> ENTER CALIBRATION MODE\r\n", g_current_node_id);
+            
             if (g_current_node_id == 0) {
                 float d01 = 0, d02 = 0, d03 = 0, d12 = 0, d13 = 0, d23 = 0;
-                vTaskDelay(pdMS_TO_TICKS(500));
-                d01 = measure_inter_anchor_tof(1); vTaskDelay(pdMS_TO_TICKS(100));
-                d02 = measure_inter_anchor_tof(2); vTaskDelay(pdMS_TO_TICKS(100));
-                d03 = measure_inter_anchor_tof(3); vTaskDelay(pdMS_TO_TICKS(100));
+                
+                printf("[A0] Waiting 2.5s for Tag to trigger A1, A2, A3...\r\n");
+                vTaskDelay(pdMS_TO_TICKS(2500));
+                
+                printf("[A0] START MEASURING TO A1, A2, A3 (UWB)...\r\n");
+                d01 = safe_measure_tof(1, 0); printf("[A0] Measured d01: %.2f\r\n", d01); vTaskDelay(pdMS_TO_TICKS(100));
+                d02 = safe_measure_tof(2, 0); printf("[A0] Measured d02: %.2f\r\n", d02); vTaskDelay(pdMS_TO_TICKS(100));
+                d03 = safe_measure_tof(3, 0); printf("[A0] Measured d03: %.2f\r\n", d03); vTaskDelay(pdMS_TO_TICKS(100));
                 
                 TickType_t s = xTaskGetTickCount();
+                TickType_t last_wait_log = s;
                 uint8_t b[32]; uint16_t l;
-                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(5000)) {
+                bool got_all_data = false;
+
+                printf("[A0] WAITING FOR BLE DISTANCES FROM A1, A2 (Max 12s)...\r\n");
+                
+                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(12000)) {
+                    if(xTaskGetTickCount() - last_wait_log > pdMS_TO_TICKS(2000)) {
+                        printf("[A0] Still waiting BLE... Current: d12=%.2f, d13=%.2f, d23=%.2f\r\n", d12, d13, d23);
+                        last_wait_log = xTaskGetTickCount();
+                    }
+
                     if (ble_scan_packet(b, &l) && l >= 7 && b[0] == 'D') {
                         float d; memcpy(&d, &b[3], 4);
-                        if (b[1] == 1 && b[2] == 2) d12 = d;
-                        if (b[1] == 1 && b[2] == 3) d13 = d;
-                        if (b[1] == 2 && b[2] == 3) d23 = d;
+                        if (d > 0.05f) {
+                            if (b[1] == 1 && b[2] == 2 && d12 == 0.0f) { d12 = d; printf("[A0] + CAUGHT d12: %.2f\r\n", d); }
+                            if (b[1] == 1 && b[2] == 3 && d13 == 0.0f) { d13 = d; printf("[A0] + CAUGHT d13: %.2f\r\n", d); }
+                            if (b[1] == 2 && b[2] == 3 && d23 == 0.0f) { d23 = d; printf("[A0] + CAUGHT d23: %.2f\r\n", d); }
+                        }
                     }
+                    
+                    if (d12 > 0.0f && d13 > 0.0f && d23 > 0.0f) {
+                        got_all_data = true;
+                        break; 
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(5)); 
                 }
                 
-                vec3 a1, a2, a3;
-                if (calculate_anchor_geometry(d01, d02, d03, d12, d13, d23, &a1, &a2, &a3)) {
-                    for (int k = 0; k < 10; k++) {
-                        ble_beacon_send_geometry(1, (float)a1.x, (float)a1.y, (float)a1.z); vTaskDelay(pdMS_TO_TICKS(15));
-                        ble_beacon_send_geometry(2, (float)a2.x, (float)a2.y, (float)a2.z); vTaskDelay(pdMS_TO_TICKS(15));
-                        ble_beacon_send_geometry(3, (float)a3.x, (float)a3.y, (float)a3.z); vTaskDelay(pdMS_TO_TICKS(15));
+                if (got_all_data) {
+                    printf("[A0] ALL DATA RECEIVED. CALCULATING GEOMETRY...\r\n");
+                    vec3 a1, a2, a3;
+                    if (calculate_anchor_geometry(d01, d02, d03, d12, d13, d23, &a1, &a2, &a3)) {
+                        
+                        printf("[A0] GEOMETRY CALCULATED. Blasting via BLE for 6s...\r\n");
+                        TickType_t blast_start = xTaskGetTickCount();
+                        while (xTaskGetTickCount() - blast_start < pdMS_TO_TICKS(6000)) {
+                            ble_beacon_send_geometry(1, (float)a1.x, (float)a1.y, (float)a1.z); vTaskDelay(pdMS_TO_TICKS(15));
+                            ble_beacon_send_geometry(2, (float)a2.x, (float)a2.y, (float)a2.z); vTaskDelay(pdMS_TO_TICKS(15));
+                            ble_beacon_send_geometry(3, (float)a3.x, (float)a3.y, (float)a3.z); vTaskDelay(pdMS_TO_TICKS(15));
+                        }
+                        
+                        my_pos_x = 0; my_pos_y = 0; my_pos_z = 0;
+                        memcpy(&tx_resp_msg[18], &my_pos_x, 4);
+                        memcpy(&tx_resp_msg[22], &my_pos_y, 4);
+                        memcpy(&tx_resp_msg[26], &my_pos_z, 4);
+                        
+                        printf("[A0] GEOMETRY UPDATE DONE. SENDING 0xED TO TAG...\r\n");
+                        uint8_t cmd[13] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xED, 0xFF, 0, 0};
+                        
+                        // FIX BỌC THÉP: Chờ dọn cờ TX để không kẹt máy phát, tăng số shot lên 15
+                        for (int i = 0; i < 15; i++) {
+                            dwt_forcetrxoff(); // Xóa sạch state cũ
+                            dwt_writetxdata(13, cmd, 0); dwt_writetxfctrl(13, 0, 1);
+                            
+                            if (dwt_starttx(DWT_START_TX_IMMEDIATE) == DWT_SUCCESS) {
+                                while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+                                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS); // Xóa cờ TX
+                            }
+                            vTaskDelay(pdMS_TO_TICKS(15));
+                        }
+                        printf("[A0] 0xED SENT.\r\n");
+                    } else {
+                        printf("[A0] MATH ERROR: calculate_anchor_geometry FAILED!\r\n");
                     }
-                    my_pos_x = 0; my_pos_y = 0; my_pos_z = 0;
-                    memcpy(&tx_resp_msg[18], &my_pos_x, 4);
-                    memcpy(&tx_resp_msg[22], &my_pos_y, 4);
-                    memcpy(&tx_resp_msg[26], &my_pos_z, 4);
+                } else {
+                    printf("[A0] TIMEOUT! MISSING DISTANCES. CALIB ABORTED.\r\n");
                 }
                 
-                uint8_t cmd[13] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xED, 0xFF, 0, 0};
-                for (int i = 0; i < 5; i++) {
-                    dwt_writetxdata(13, cmd, 0); dwt_writetxfctrl(13, 0, 1);
-                    dwt_starttx(DWT_START_TX_IMMEDIATE);
-                    vTaskDelay(pdMS_TO_TICKS(10));
-                }
             } else if (g_current_node_id == 1) {
-                serve_as_inter_anchor_responder(2000, 1);
-                float d12 = measure_inter_anchor_tof(2); vTaskDelay(pdMS_TO_TICKS(100));
-                float d13 = measure_inter_anchor_tof(3); vTaskDelay(pdMS_TO_TICKS(100));
-                send_ble_distance(1, 2, d12); send_ble_distance(1, 3, d13);
+                printf("[A1] Responding to A0 UWB requests (4s window)...\r\n");
+                serve_as_inter_anchor_responder(4000, 1); 
+                
+                printf("[A1] Measuring to A2, A3...\r\n");
+                float d12 = safe_measure_tof(2, 1); vTaskDelay(pdMS_TO_TICKS(50));
+                float d13 = safe_measure_tof(3, 1); vTaskDelay(pdMS_TO_TICKS(50));
+                
+                robust_ble_blast_distances(1, 2, d12, 3, d13);
+                
+                printf("[A1] WAITING FOR GEOMETRY FROM A0 (Max 8s)...\r\n");
                 TickType_t s = xTaskGetTickCount();
-                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(5000)) {
-                    if (ble_scan_for_geometry(1, &my_pos_x, &my_pos_y, &my_pos_z)) break;
+                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
+                    if (ble_scan_for_geometry(1, &my_pos_x, &my_pos_y, &my_pos_z)) {
+                        printf("\r\n[A1] <<< GEOMETRY UPDATED: (%.2f, %.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y, my_pos_z);
+                        break;
+                    }
                 }
                 memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4); memcpy(&tx_resp_msg[26], &my_pos_z, 4);
+                
             } else if (g_current_node_id == 2) {
-                serve_as_inter_anchor_responder(4000, 2);
-                float d23 = measure_inter_anchor_tof(3); vTaskDelay(pdMS_TO_TICKS(100));
-                send_ble_distance(2, 3, d23);
+                printf("[A2] Responding to A0, A1 UWB requests (6s window)...\r\n");
+                serve_as_inter_anchor_responder(6000, 2);
+                
+                printf("[A2] Measuring to A3...\r\n");
+                float d23 = safe_measure_tof(3, 2); vTaskDelay(pdMS_TO_TICKS(50));
+                
+                robust_ble_blast_distances(2, 3, d23, 0, 0.0f);
+                
+                printf("[A2] WAITING FOR GEOMETRY FROM A0 (Max 8s)...\r\n");
                 TickType_t s = xTaskGetTickCount();
-                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(5000)) {
-                    if (ble_scan_for_geometry(2, &my_pos_x, &my_pos_y, &my_pos_z)) break;
+                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
+                    if (ble_scan_for_geometry(2, &my_pos_x, &my_pos_y, &my_pos_z)) {
+                        printf("\r\n[A2] <<< GEOMETRY UPDATED: (%.2f, %.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y, my_pos_z);
+                        break;
+                    }
                 }
                 memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4); memcpy(&tx_resp_msg[26], &my_pos_z, 4);
+                
             } else if (g_current_node_id == 3) {
-                serve_as_inter_anchor_responder(6000, 3);
+                printf("[A3] Responding to A0, A1, A2 UWB requests (8s window)...\r\n");
+                serve_as_inter_anchor_responder(8000, 3);
+                
+                printf("[A3] WAITING FOR GEOMETRY FROM A0 (Max 8s)...\r\n");
                 TickType_t s = xTaskGetTickCount();
-                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(5000)) {
-                    if (ble_scan_for_geometry(3, &my_pos_x, &my_pos_y, &my_pos_z)) break;
+                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
+                    if (ble_scan_for_geometry(3, &my_pos_x, &my_pos_y, &my_pos_z)) {
+                        printf("\r\n[A3] <<< GEOMETRY UPDATED: (%.2f, %.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y, my_pos_z);
+                        break;
+                    }
                 }
                 memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4); memcpy(&tx_resp_msg[26], &my_pos_z, 4);
             }
+            
             g_is_calibrating = false;
-            printf("[ANCHOR %d] EXIT CALIBRATION -> RESUMING NORMAL MODE\r\n", g_current_node_id);
+            printf("[A%d] EXIT CALIBRATION -> RESUMING NORMAL MODE\r\n", g_current_node_id);
             continue;
         }
 
         TickType_t now = xTaskGetTickCount();
-        if (now - last_status_log > pdMS_TO_TICKS(5000)) {
-            printf("[ANCHOR %d] STATUS: NORMAL LOCALIZATION\r\n", g_current_node_id);
+        if (now - last_status_log > pdMS_TO_TICKS(3000)) {
+            printf("[A%d] STATUS: LISTENING FOR UWB & BLE...\r\n", g_current_node_id);
             last_status_log = now;
         }
 
@@ -143,8 +253,12 @@ void ss_responder_task_function(void *pvParameter) {
             if (frame_len <= sizeof(rx_buffer)) dwt_readrxdata(rx_buffer, frame_len, 0);
 
             if (rx_buffer[9] == 0xEC) {
+                printf("[A%d] <<< RX Raw UWB 0xEC - Target byte in packet: %d\r\n", g_current_node_id, rx_buffer[10]);
+            }
+
+            if (rx_buffer[9] == 0xEC && (rx_buffer[10] == g_current_node_id || rx_buffer[10] == 0xFF)) {
                 if (!g_is_calibrating) {
-                    printf("[ANCHOR %d] RECEIVED 0xEC -> SWITCH TO CALIB MODE\r\n", g_current_node_id);
+                    printf("[A%d] MATCHED TARGET ID %d -> SWITCH TO CALIB MODE\r\n", g_current_node_id, rx_buffer[10]);
                 }
                 g_is_calibrating = true;
                 continue;
@@ -174,7 +288,7 @@ void ss_responder_task_function(void *pvParameter) {
                 if (cfg.target_mac == g_my_mac || cfg.target_mac == 0xFFFF) {
                     if (cfg.role == 99 && cfg.node_id == 0) {
                         if (!g_is_calibrating) {
-                            printf("[ANCHOR %d] RECEIVED ROLE 99 VIA BLE -> SWITCH TO CALIB MODE\r\n", g_current_node_id);
+                            printf("[A%d] <<< RECEIVED ROLE 99 VIA BLE -> SWITCH TO CALIB MODE\r\n", g_current_node_id);
                         }
                         g_is_calibrating = true;
                     } else {

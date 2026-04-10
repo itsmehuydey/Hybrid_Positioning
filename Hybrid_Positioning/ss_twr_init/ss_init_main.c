@@ -18,6 +18,7 @@
 
 extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
+extern uint8_t g_current_role; 
 extern void flash_config_write(uint8_t role, uint8_t id);
 
 static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f, 0.0f}; 
@@ -78,6 +79,11 @@ void ss_initiator_task_function(void *pvParameter) {
     ble_raw_beacon_init(g_current_node_id);
     printf("[TAG] SYSTEM STARTING\r\n");
 
+    if (g_current_role == 99) {
+        g_is_calibrating = true;
+        printf("[TAG] BOOTED WITH ROLE 99 -> AUTO-START CALIBRATION\r\n");
+    }
+
     for (int i = 0; i < MAX_ANCHORS; i++) {
         anchors_info[i].is_valid = false;
         anchors_info[i].last_update_tick = 0;
@@ -88,34 +94,69 @@ void ss_initiator_task_function(void *pvParameter) {
 
     while (1) {
         if (g_is_calibrating) {
-            printf("[TAG] TRIGGER CALIBRATION -> SEND 0xEC\r\n");
-            printf("[TAG] STATUS: CALIBRATING MODE\r\n");
-            reset_uwb_state();
-            tx_poll_msg[9] = 0xEC;
-            tx_poll_msg[10] = 0xFF;
-            dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
-            dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);
-            if (dwt_starttx(DWT_START_TX_IMMEDIATE) == DWT_SUCCESS) {
-                 while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
-                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+            printf("\r\n==========================================\r\n");
+            printf("[TAG] TRIGGER CALIBRATION -> SENDING 0xEC\r\n");
+            printf("==========================================\r\n");
+            
+            for (int a = 0; a < MAX_ANCHORS; a++) {
+                tx_poll_msg[9] = 0xEC;
+                tx_poll_msg[10] = (uint8_t)a; 
+                
+                printf("[TAG] ---> Firing rapid Unicast 0xEC to Anchor %d...\r\n", a);
+                for(int retry = 0; retry < 15; retry++) {
+                    reset_uwb_state();
+                    tx_poll_msg[2]++; 
+                    dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
+                    dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);
+                    
+                    if (dwt_starttx(DWT_START_TX_IMMEDIATE) == DWT_SUCCESS) {
+                         while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+                         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+                    }
+                    vTaskDelay(pdMS_TO_TICKS(15)); 
+                }
+                printf("[TAG]   + Done sending to A%d\r\n", a);
             }
             
+            printf("[TAG] DONE SENDING 0xEC. WAITING FOR 0xED FROM A0 (Max 20s)...\r\n");
             TickType_t s = xTaskGetTickCount();
-            while (xTaskGetTickCount() - s < pdMS_TO_TICKS(15000)) { 
+            TickType_t last_wait_log = s;
+            
+            while (xTaskGetTickCount() - s < pdMS_TO_TICKS(20000)) { 
+                if(xTaskGetTickCount() - last_wait_log > pdMS_TO_TICKS(4000)) {
+                    printf("[TAG] ... still waiting for 0xED ...\r\n");
+                    last_wait_log = xTaskGetTickCount();
+                }
+
+                // FIX BỌC THÉP: Xóa cờ Timeout cũ để tránh bị mù vô tuyến
+                reset_uwb_state(); 
                 dwt_setrxtimeout(65000);
                 dwt_rxenable(DWT_START_RX_IMMEDIATE);
+                
                 while (!((dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR))) {
-                    if (xTaskGetTickCount() - s >= pdMS_TO_TICKS(15000)) break;
+                    if (xTaskGetTickCount() - s >= pdMS_TO_TICKS(20000)) break;
                 }
+                
                 if (dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_RXFCG) {
                     dwt_readrxdata(rx_buffer, 32, 0);
-                    if (rx_buffer[9] == 0xED) break;
+                    if (rx_buffer[9] == 0xED) {
+                        printf("\r\n[TAG] <<< RECEIVED 0xED FROM A0! CALIBRATION DONE!\r\n");
+                        break;
+                    }
                 }
             }
             
             g_is_calibrating = false;
-            tx_poll_msg[9] = 0xE0;
-            printf("[TAG] RECEIVED 0xED -> RESUME NORMAL\r\n");
+            tx_poll_msg[9] = 0xE0; 
+            printf("[TAG] RESUMING NORMAL MODE\r\n==========================================\r\n");
+
+            if (g_current_role == 99) {
+                printf("[TAG] CALIBRATION FINISHED. REVERTING FLASH TO ROLE 1 AND RESETTING...\r\n");
+                flash_config_write(1, g_current_node_id);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                NVIC_SystemReset();
+            }
+
             continue;
         }
 
@@ -174,7 +215,7 @@ void ss_initiator_task_function(void *pvParameter) {
                         }
                     } else if (rx_buffer[9] == 0xEC) {
                         if (!g_is_calibrating) {
-                            printf("[TAG] RECEIVED 0xEC VIA UWB -> SWITCH TO CALIB MODE\r\n");
+                            printf("[TAG] <<< RECEIVED 0xEC VIA UWB -> SWITCH TO CALIB MODE\r\n");
                         }
                         g_is_calibrating = true;
                     }
@@ -189,11 +230,9 @@ void ss_initiator_task_function(void *pvParameter) {
             float d2 = anchors_info[2].is_valid ? anchors_info[2].dist : 0.0f;
             float d3 = anchors_info[3].is_valid ? anchors_info[3].dist : 0.0f;
 
-            // In log cho bạn xem d[4]
             printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"measuring\",\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"d\":[%.2f,%.2f,%.2f,%.2f]}\r\n", 
                    g_current_node_id, tag_x, tag_y, tag_z, d0, d1, d2, d3);
 
-            // Rút gọn Payload BLE xuống còn 15 bytes
             #pragma pack(push, 1)
             typedef struct {
                 uint8_t start_byte; 
@@ -226,7 +265,7 @@ void ss_initiator_task_function(void *pvParameter) {
             if (cfg.target_mac == g_my_mac || cfg.target_mac == 0xFFFF) {
                 if (cfg.role == 99 && cfg.node_id == 0) {
                     if (!g_is_calibrating) {
-                        printf("[TAG] RECEIVED ROLE 99 VIA BLE -> SWITCH TO CALIB MODE\r\n");
+                        printf("[TAG] <<< RECEIVED ROLE 99 VIA BLE -> SWITCH TO CALIB MODE\r\n");
                     }
                     g_is_calibrating = true;
                 } else {
