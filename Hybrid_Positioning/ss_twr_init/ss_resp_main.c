@@ -33,26 +33,47 @@ static uint8_t tx_resp_msg[31] = {
 static uint8_t rx_buffer[64];
 
 // ======================================================================
-// HÀM MỚI: Lấy 20 mẫu UWB rồi tính trung bình
+// Lấy 50 mẫu UWB, lọc nhiễu dội tường (Trimmed Mean) rồi tính trung bình
 // ======================================================================
 static float average_measure_tof(uint8_t target, uint8_t my_id) {
-    float sum = 0.0f;
+    float samples[50];
     int count = 0;
-    int max_tries = 60; // Thử tối đa 60 lần để vớt đủ 20 mẫu
+    int max_tries = 150; // Thử tối đa 150 lần để đảm bảo vớt đủ 50 mẫu
     
-    printf("[A%d] Sampling 20 dists to A%d...\r\n", my_id, target);
-    for (int i = 0; i < max_tries && count < 20; i++) { 
+    printf("[A%d] Sampling 50 dists to A%d...\r\n", my_id, target);
+    for (int i = 0; i < max_tries && count < 50; i++) { 
         float d = measure_inter_anchor_tof(target);
         if (d > 0.05f && d < 100.0f) {
-            sum += d;
+            samples[count] = d;
             count++;
         }
-        vTaskDelay(pdMS_TO_TICKS(5)); // Delay nhỏ để nhường RTOS
+        vTaskDelay(pdMS_TO_TICKS(5)); 
     }
     
     if (count > 0) {
-        float avg = sum / count;
-        printf("[A%d] Avg to A%d: %.3f (from %d valid samples)\r\n", my_id, target, avg, count);
+        // Sắp xếp mảng từ nhỏ đến lớn (Bubble Sort)
+        for (int i = 0; i < count - 1; i++) {
+            for (int j = 0; j < count - i - 1; j++) {
+                if (samples[j] > samples[j+1]) {
+                    float temp = samples[j];
+                    samples[j] = samples[j+1];
+                    samples[j+1] = temp;
+                }
+            }
+        }
+        
+        // Loại bỏ 20% nhiễu cao (dội tường) và 20% nhiễu thấp
+        int trim = count / 5; 
+        float sum = 0.0f;
+        int valid_count = 0;
+        
+        for (int i = trim; i < count - trim; i++) {
+            sum += samples[i];
+            valid_count++;
+        }
+        
+        float avg = sum / valid_count;
+        printf("[A%d] Avg to A%d: %.3f (from %d raw, %d filtered)\r\n", my_id, target, avg, count, valid_count);
         return avg; 
     }
     
@@ -88,7 +109,6 @@ static void robust_ble_blast_distances(uint8_t my_id, uint8_t t1, float d1, uint
 }
 
 void ss_responder_task_function(void *pvParameter) {
-    // Kéo tọa độ từ Flash. Nếu Flash trắng (0,0) thì gán tọa độ ảo mặc định cho 2D
     if (g_my_pos_x == 0.0f && g_my_pos_y == 0.0f && g_current_node_id != 0) {
         if (g_current_node_id == 1) my_pos_x = 1.0f;
         else if (g_current_node_id == 2) my_pos_y = 1.0f;
@@ -120,7 +140,7 @@ void ss_responder_task_function(void *pvParameter) {
                 printf("[A0] Waiting 2.5s for Tag to trigger A1, A2, A3...\r\n");
                 vTaskDelay(pdMS_TO_TICKS(2500));
                 
-                printf("[A0] START MEASURING TO A1, A2, A3 (UWB AVERAGING)...\r\n");
+                printf("[A0] START MEASURING TO A1, A2, A3 (UWB 50 SAMPLES)...\r\n");
                 d01 = average_measure_tof(1, 0); 
                 d02 = average_measure_tof(2, 0); 
                 d03 = average_measure_tof(3, 0); 
@@ -130,9 +150,10 @@ void ss_responder_task_function(void *pvParameter) {
                 uint8_t b[32]; uint16_t l;
                 bool got_all_data = false;
 
-                printf("[A0] WAITING FOR BLE DISTANCES FROM A1, A2 (Max 12s)...\r\n");
+                printf("[A0] WAITING FOR BLE DISTANCES FROM A1, A2 (Max 15s)...\r\n");
                 
-                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(12000)) {
+                // Tăng thời gian chờ lên 15s vì A1, A2 cần thời gian lấy 50 mẫu
+                while (xTaskGetTickCount() - s < pdMS_TO_TICKS(15000)) {
                     if(xTaskGetTickCount() - last_wait_log > pdMS_TO_TICKS(2000)) {
                         printf("[A0] Still waiting BLE... Current: d12=%.2f, d13=%.2f, d23=%.2f\r\n", d12, d13, d23);
                         last_wait_log = xTaskGetTickCount();
@@ -167,7 +188,6 @@ void ss_responder_task_function(void *pvParameter) {
                             ble_beacon_send_geometry(3, (float)a3.x, (float)a3.y); vTaskDelay(pdMS_TO_TICKS(15));
                         }
                         
-                        // LƯU TỌA ĐỘ VÀO FLASH CHO A0 (Gốc 0,0)
                         my_pos_x = 0; my_pos_y = 0;
                         g_my_pos_x = 0; g_my_pos_y = 0;
                         printf("[A0] Saving pos to Flash: 0, 0\r\n");
@@ -197,10 +217,10 @@ void ss_responder_task_function(void *pvParameter) {
                 }
                 
             } else if (g_current_node_id == 1) {
-                printf("[A1] Responding to A0 UWB requests (4s window)...\r\n");
-                serve_as_inter_anchor_responder(4000, 1); 
+                printf("[A1] Responding to A0 UWB requests (5s window)...\r\n");
+                serve_as_inter_anchor_responder(5000, 1); 
                 
-                printf("[A1] Measuring to A2, A3 (AVERAGING)...\r\n");
+                printf("[A1] Measuring to A2, A3 (50 SAMPLES)...\r\n");
                 float d12 = average_measure_tof(2, 1); 
                 float d13 = average_measure_tof(3, 1); 
                 
@@ -211,7 +231,6 @@ void ss_responder_task_function(void *pvParameter) {
                 while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
                     if (ble_scan_for_geometry(1, &my_pos_x, &my_pos_y)) {
                         printf("\r\n[A1] <<< GEOMETRY UPDATED: (%.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y);
-                        // LƯU FLASH
                         g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y;
                         flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                         printf("[A1] Saved to Flash permanently.\r\n");
@@ -221,10 +240,10 @@ void ss_responder_task_function(void *pvParameter) {
                 memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4);
                 
             } else if (g_current_node_id == 2) {
-                printf("[A2] Responding to A0, A1 UWB requests (6s window)...\r\n");
-                serve_as_inter_anchor_responder(6000, 2);
+                printf("[A2] Responding to A0, A1 UWB requests (8s window)...\r\n");
+                serve_as_inter_anchor_responder(8000, 2);
                 
-                printf("[A2] Measuring to A3 (AVERAGING)...\r\n");
+                printf("[A2] Measuring to A3 (50 SAMPLES)...\r\n");
                 float d23 = average_measure_tof(3, 2); 
                 
                 robust_ble_blast_distances(2, 3, d23, 0, 0.0f);
@@ -234,7 +253,6 @@ void ss_responder_task_function(void *pvParameter) {
                 while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
                     if (ble_scan_for_geometry(2, &my_pos_x, &my_pos_y)) {
                         printf("\r\n[A2] <<< GEOMETRY UPDATED: (%.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y);
-                        // LƯU FLASH
                         g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y;
                         flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                         printf("[A2] Saved to Flash permanently.\r\n");
@@ -244,15 +262,14 @@ void ss_responder_task_function(void *pvParameter) {
                 memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4);
                 
             } else if (g_current_node_id == 3) {
-                printf("[A3] Responding to A0, A1, A2 UWB requests (8s window)...\r\n");
-                serve_as_inter_anchor_responder(8000, 3);
+                printf("[A3] Responding to A0, A1, A2 UWB requests (10s window)...\r\n");
+                serve_as_inter_anchor_responder(10000, 3);
                 
                 printf("[A3] WAITING FOR GEOMETRY FROM A0 (Max 8s)...\r\n");
                 TickType_t s = xTaskGetTickCount();
                 while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
                     if (ble_scan_for_geometry(3, &my_pos_x, &my_pos_y)) {
                         printf("\r\n[A3] <<< GEOMETRY UPDATED: (%.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y);
-                        // LƯU FLASH
                         g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y;
                         flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                         printf("[A3] Saved to Flash permanently.\r\n");
@@ -283,14 +300,7 @@ void ss_responder_task_function(void *pvParameter) {
             uint32_t frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
             if (frame_len <= sizeof(rx_buffer)) dwt_readrxdata(rx_buffer, frame_len, 0);
 
-            if (rx_buffer[9] == 0xEC) {
-                printf("[A%d] <<< RX Raw UWB 0xEC - Target byte in packet: %d\r\n", g_current_node_id, rx_buffer[10]);
-            }
-
             if (rx_buffer[9] == 0xEC && (rx_buffer[10] == g_current_node_id || rx_buffer[10] == 0xFF)) {
-                if (!g_is_calibrating) {
-                    printf("[A%d] MATCHED TARGET ID %d -> SWITCH TO CALIB MODE\r\n", g_current_node_id, rx_buffer[10]);
-                }
                 g_is_calibrating = true;
                 continue;
             }
@@ -318,12 +328,8 @@ void ss_responder_task_function(void *pvParameter) {
             if (ble_scan_for_config(&cfg)) {
                 if (cfg.target_mac == g_my_mac || cfg.target_mac == 0xFFFF) {
                     if (cfg.role == 99 && cfg.node_id == 0) {
-                        if (!g_is_calibrating) {
-                            printf("[A%d] <<< RECEIVED ROLE 99 VIA BLE -> SWITCH TO CALIB MODE\r\n", g_current_node_id);
-                        }
                         g_is_calibrating = true;
                     } else {
-                        // Nhận lệnh đổi Role, lưu Flash cả role, id và tọa độ
                         flash_config_write(cfg.role, cfg.node_id, g_my_pos_x, g_my_pos_y);
                         vTaskDelay(pdMS_TO_TICKS(100));
                         NVIC_SystemReset();
@@ -345,7 +351,7 @@ void ss_responder_task_function(void *pvParameter) {
             pkt.start_byte = '['; pkt.id = g_current_node_id;
             pkt.x = my_pos_x; pkt.y = my_pos_y;
 
-            for(int i = 0; i < 10; i++) {
+            for(int i = 0; i < 3; i++) {
                 pkt.seq = anchor_seq++;
                 ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
                 vTaskDelay(pdMS_TO_TICKS(15));

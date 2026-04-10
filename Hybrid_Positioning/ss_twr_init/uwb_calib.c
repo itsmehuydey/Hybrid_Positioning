@@ -13,6 +13,9 @@
 #define FREQ_OFFSET_MULTIPLIER     (998.4e6 / 2.0 / 1024.0 / 131072.0)
 #define HERTZ_TO_PPM_MULTIPLIER_CHAN_5 (-1.0e6 / 6489.6e6)
 
+// Thêm biến bù trừ phần mềm (Antenna Delay Offset). Giá trị 0.52 tương đương 52cm sai số.
+#define UWB_HARDWARE_OFFSET        0.52f 
+
 static uint8_t rx_buffer[64];
 static uint8_t tx_resp_msg[31] = {
     0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 
@@ -58,7 +61,14 @@ float measure_inter_anchor_tof(uint8_t target_id) {
                 int32_t rtd_resp = (int32_t)(t_reply_t - t_reply_r);
                 float clockOffsetRatio = dwt_readcarrierintegrator() * (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6);
                 double tof = ((double)rtd_init - (double)rtd_resp * (1.0f - clockOffsetRatio)) / 2.0;
-                return (float)(tof * DWT_TIME_UNITS * SPEED_OF_LIGHT);
+                
+                // Tính khoảng cách thô
+                float raw_dist = (float)(tof * DWT_TIME_UNITS * SPEED_OF_LIGHT);
+                
+                // Trừ đi sai số phần cứng để tối ưu hiệu chuẩn (Optimization)
+                float final_dist = raw_dist - UWB_HARDWARE_OFFSET;
+                
+                return (final_dist > 0.01f) ? final_dist : 0.01f;
             }
         }
     }
