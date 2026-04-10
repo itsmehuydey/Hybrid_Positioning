@@ -18,18 +18,18 @@
 .Ltext0:
 	.cfi_sections	.debug_frame
 	.file 1 "D:\\TN\\Hybrid_Positioning\\Hybrid_Positioning\\ss_twr_init\\utils.c"
-	.section	.text.tof_3d_localize,"ax",%progbits
+	.section	.text.tof_2d_localize,"ax",%progbits
 	.align	1
-	.global	tof_3d_localize
+	.global	tof_2d_localize
 	.syntax unified
 	.thumb
 	.thumb_func
-	.type	tof_3d_localize, %function
-tof_3d_localize:
+	.type	tof_2d_localize, %function
+tof_2d_localize:
 .LFB13:
 	.loc 1 13 1
 	.cfi_startproc
-	@ args = 0, pretend = 0, frame = 488
+	@ args = 0, pretend = 0, frame = 320
 	@ frame_needed = 0, uses_anonymous_args = 0
 	push	{r4, r5, r6, r7, r8, r9, r10, fp, lr}
 	.cfi_def_cfa_offset 36
@@ -42,41 +42,41 @@ tof_3d_localize:
 	.cfi_offset 10, -12
 	.cfi_offset 11, -8
 	.cfi_offset 14, -4
-	sub	sp, sp, #492
-	.cfi_def_cfa_offset 528
-	add	r4, sp, #488
-	sub	r4, r4, #412
+	sub	sp, sp, #324
+	.cfi_def_cfa_offset 360
+	add	r4, sp, #320
+	sub	r4, r4, #276
 	str	r0, [r4]
-	add	r0, sp, #488
-	sub	r0, r0, #416
+	add	r0, sp, #320
+	sub	r0, r0, #280
 	str	r1, [r0]
-	add	r1, sp, #488
-	sub	r1, r1, #420
+	add	r1, sp, #320
+	sub	r1, r1, #284
 	str	r2, [r1]
-	add	r2, sp, #488
-	sub	r2, r2, #424
+	add	r2, sp, #320
+	sub	r2, r2, #288
 	str	r3, [r2]
 	.loc 1 15 8
-	add	r3, sp, #488
-	sub	r3, r3, #416
+	add	r3, sp, #320
+	sub	r3, r3, #280
 	ldr	r3, [r3]
-	cmp	r3, #3
+	cmp	r3, #2
 	ble	.L2
 	.loc 1 15 25 discriminator 1
-	add	r3, sp, #488
-	sub	r3, r3, #412
+	add	r3, sp, #320
+	sub	r3, r3, #276
 	ldr	r3, [r3]
 	cmp	r3, #0
 	beq	.L2
 	.loc 1 15 33 discriminator 2
-	add	r3, sp, #488
-	sub	r3, r3, #420
+	add	r3, sp, #320
+	sub	r3, r3, #284
 	ldr	r3, [r3]
 	cmp	r3, #0
 	beq	.L2
 	.loc 1 15 47 discriminator 3
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r3, [r3]
 	cmp	r3, #0
 	bne	.L3
@@ -86,8 +86,8 @@ tof_3d_localize:
 	b	.L4
 .L3:
 	.loc 1 19 9
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r3, [r3]
 	vldr.64	d7, [r3]
 	vmov.f32	s0, s14
@@ -98,8 +98,8 @@ tof_3d_localize:
 	cmp	r3, #0
 	bne	.L5
 	.loc 1 19 30 discriminator 1
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r3, [r3]
 	vldr.64	d7, [r3, #8]
 	vmov.f32	s0, s14
@@ -109,33 +109,21 @@ tof_3d_localize:
 	.loc 1 19 27 discriminator 1
 	cmp	r3, #0
 	bne	.L5
-	.loc 1 19 51 discriminator 2
-	add	r3, sp, #488
-	sub	r3, r3, #424
-	ldr	r3, [r3]
-	vldr.64	d7, [r3, #16]
-	vmov.f32	s0, s14
-	vmov.f32	s1, s15
-	bl	__SEGGER_RTL_float64_isnan
-	mov	r3, r0
-	.loc 1 19 48 discriminator 1
-	cmp	r3, #0
-	bne	.L5
 	.loc 1 20 9
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r3, [r3]
 	vldr.64	d7, [r3]
 	vmov.f32	s0, s14
 	vmov.f32	s1, s15
 	bl	__SEGGER_RTL_float64_isinf
 	mov	r3, r0
-	.loc 1 19 69 discriminator 3
+	.loc 1 19 48 discriminator 2
 	cmp	r3, #0
 	bne	.L5
 	.loc 1 20 30
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r3, [r3]
 	vldr.64	d7, [r3, #8]
 	vmov.f32	s0, s14
@@ -145,29 +133,17 @@ tof_3d_localize:
 	.loc 1 20 27 discriminator 1
 	cmp	r3, #0
 	bne	.L5
-	.loc 1 20 51 discriminator 1
-	add	r3, sp, #488
-	sub	r3, r3, #424
-	ldr	r3, [r3]
-	vldr.64	d7, [r3, #16]
-	vmov.f32	s0, s14
-	vmov.f32	s1, s15
-	bl	__SEGGER_RTL_float64_isinf
-	mov	r3, r0
-	.loc 1 20 48 discriminator 1
-	cmp	r3, #0
-	bne	.L5
 	.loc 1 21 21
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r3, [r3]
 	ldrd	r2, [r3]
 	.loc 1 21 9
 	mov	r6, r2
 	bic	r7, r3, #-2147483648
-	.loc 1 20 69 discriminator 2
+	.loc 1 20 48 discriminator 1
 	mov	r2, #0
-	ldr	r3, .L64+8
+	ldr	r3, .L58+8
 	mov	r0, r6
 	mov	r1, r7
 	bl	__aeabi_dcmpgt
@@ -175,8 +151,8 @@ tof_3d_localize:
 	cmp	r3, #0
 	bne	.L5
 	.loc 1 21 51
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r3, [r3]
 	ldrd	r2, [r3, #8]
 	.loc 1 21 39
@@ -184,281 +160,190 @@ tof_3d_localize:
 	bic	r9, r3, #-2147483648
 	.loc 1 21 36
 	mov	r2, #0
-	ldr	r3, .L64+8
+	ldr	r3, .L58+8
 	mov	r0, r8
 	mov	r1, r9
-	bl	__aeabi_dcmpgt
-	mov	r3, r0
-	cmp	r3, #0
-	bne	.L5
-	.loc 1 21 81 discriminator 1
-	add	r3, sp, #488
-	sub	r3, r3, #424
-	ldr	r3, [r3]
-	ldrd	r2, [r3, #16]
-	.loc 1 21 69 discriminator 1
-	mov	r10, r2
-	bic	fp, r3, #-2147483648
-	.loc 1 21 66 discriminator 1
-	mov	r2, #0
-	ldr	r3, .L64+8
-	mov	r0, r10
-	mov	r1, fp
 	bl	__aeabi_dcmpgt
 	mov	r3, r0
 	cmp	r3, #0
 	beq	.L6
 .L5:
 	.loc 1 23 20
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r1, [r3]
 	mov	r2, #0
 	mov	r3, #0
 	strd	r2, [r1]
 	.loc 1 24 20
-	add	r3, sp, #488
-	sub	r3, r3, #424
+	add	r3, sp, #320
+	sub	r3, r3, #288
 	ldr	r1, [r3]
 	mov	r2, #0
 	mov	r3, #0
 	strd	r2, [r1, #8]
-	.loc 1 25 20
-	add	r3, sp, #488
-	sub	r3, r3, #424
-	ldr	r1, [r3]
-	mov	r2, #0
-	mov	r3, #0
-	strd	r2, [r1, #16]
 .L6:
-	.loc 1 31 9
+	.loc 1 30 9
 	movs	r3, #0
-	str	r3, [sp, #460]
+	str	r3, [sp, #300]
 .LBB2:
-	.loc 1 32 14
+	.loc 1 31 14
 	movs	r3, #1
-	str	r3, [sp, #456]
-	.loc 1 32 5
+	str	r3, [sp, #296]
+	.loc 1 31 5
 	b	.L8
 .L11:
-	.loc 1 33 22
-	ldr	r3, [sp, #456]
-	lsls	r2, r3, #3
-	add	r3, sp, #488
-	sub	r3, r3, #420
-	ldr	r3, [r3]
+	.loc 1 32 22
+	ldr	r3, [sp, #296]
+	lsls	r3, r3, #3
+	add	r2, sp, #320
+	sub	r2, r2, #284
+	ldr	r2, [r2]
 	add	r3, r3, r2
 	ldrd	r0, [r3]
-	.loc 1 33 37
-	ldr	r3, [sp, #460]
-	lsls	r2, r3, #3
-	add	r3, sp, #488
-	sub	r3, r3, #420
-	ldr	r3, [r3]
+	.loc 1 32 37
+	ldr	r3, [sp, #300]
+	lsls	r3, r3, #3
+	add	r2, sp, #320
+	sub	r2, r2, #284
+	ldr	r2, [r2]
 	add	r3, r3, r2
 	ldrd	r2, [r3]
-	.loc 1 33 12
+	.loc 1 32 12
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
 	beq	.L9
-	.loc 1 34 19
-	ldr	r3, [sp, #456]
-	str	r3, [sp, #460]
+	.loc 1 33 19
+	ldr	r3, [sp, #296]
+	str	r3, [sp, #300]
 .L9:
-	.loc 1 32 39 discriminator 2
-	ldr	r3, [sp, #456]
+	.loc 1 31 39 discriminator 2
+	ldr	r3, [sp, #296]
 	adds	r3, r3, #1
-	str	r3, [sp, #456]
+	str	r3, [sp, #296]
 .L8:
-	.loc 1 32 23 discriminator 1
-	add	r3, sp, #488
-	sub	r3, r3, #416
-	ldr	r2, [sp, #456]
+	.loc 1 31 23 discriminator 1
+	add	r3, sp, #320
+	sub	r3, r3, #280
+	ldr	r2, [sp, #296]
 	ldr	r3, [r3]
 	cmp	r2, r3
 	blt	.L11
 .LBE2:
-	.loc 1 36 17
-	ldr	r2, [sp, #460]
-	mov	r3, r2
-	lsls	r3, r3, #1
+	.loc 1 35 17
+	ldr	r3, [sp, #300]
+	lsls	r3, r3, #4
+	add	r2, sp, #320
+	sub	r2, r2, #276
+	ldr	r2, [r2]
 	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
+	.loc 1 35 12
+	ldrd	r2, [r3]
+	strd	r2, [sp, #312]
+	.loc 1 36 17
+	ldr	r3, [sp, #300]
+	lsls	r3, r3, #4
+	add	r2, sp, #320
+	sub	r2, r2, #276
+	ldr	r2, [r2]
 	add	r3, r3, r2
 	.loc 1 36 12
-	ldrd	r2, [r3]
-	strd	r2, [sp, #480]
-	.loc 1 37 17
-	ldr	r2, [sp, #460]
-	mov	r3, r2
-	lsls	r3, r3, #1
-	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
-	add	r3, r3, r2
-	.loc 1 37 12
 	ldrd	r2, [r3, #8]
-	strd	r2, [sp, #472]
-	.loc 1 38 17
-	ldr	r2, [sp, #460]
-	mov	r3, r2
-	lsls	r3, r3, #1
-	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
-	add	r3, r3, r2
+	strd	r2, [sp, #304]
 	.loc 1 38 12
-	ldrd	r2, [r3, #16]
-	strd	r2, [sp, #464]
-	.loc 1 40 12
-	adr	r3, .L64
+	adr	r3, .L58
 	ldrd	r2, [r3]
-	strd	r2, [sp, #448]
-	.loc 1 41 15
+	strd	r2, [sp, #288]
+	.loc 1 39 15
 	movs	r3, #50
-	str	r3, [sp, #376]
+	str	r3, [sp, #224]
 .LBB3:
-	.loc 1 43 14
+	.loc 1 41 14
 	movs	r3, #0
-	str	r3, [sp, #444]
-	.loc 1 43 5
+	str	r3, [sp, #284]
+	.loc 1 41 5
 	b	.L12
-.L47:
+.L43:
 .LBB4:
-	.loc 1 45 16
-	add	r3, sp, #488
-	sub	r3, r3, #408
+	.loc 1 43 16
+	add	r3, sp, #320
+	sub	r3, r3, #272
 	mov	r0, r3
-	movs	r3, #72
+	movs	r3, #32
 	mov	r2, r3
 	movs	r1, #0
 	bl	memset
-	.loc 1 46 16
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	mov	r2, r3
-	movs	r3, #0
-	str	r3, [r2]
-	str	r3, [r2, #4]
-	str	r3, [r2, #8]
-	str	r3, [r2, #12]
-	str	r3, [r2, #16]
-	str	r3, [r2, #20]
-	.loc 1 47 16
+	.loc 1 44 16
+	add	r3, sp, #112
+	movs	r2, #0
+	str	r2, [r3]
+	str	r2, [r3, #4]
+	str	r2, [r3, #8]
+	str	r2, [r3, #12]
+	.loc 1 45 16
 	mov	r2, #0
 	mov	r3, #0
-	strd	r2, [sp, #432]
+	strd	r2, [sp, #272]
 .LBB5:
-	.loc 1 50 18
+	.loc 1 48 18
 	movs	r3, #0
-	str	r3, [sp, #428]
-	.loc 1 50 9
+	str	r3, [sp, #268]
+	.loc 1 48 9
 	b	.L13
-.L65:
+.L59:
 	.align	3
-.L64:
+.L58:
 	.word	-1717986918
 	.word	1069128089
 	.word	1079574528
 .L16:
 .LBB6:
-	.loc 1 52 37
-	ldr	r2, [sp, #428]
-	mov	r3, r2
-	lsls	r3, r3, #1
+	.loc 1 50 37
+	ldr	r3, [sp, #268]
+	lsls	r3, r3, #4
+	add	r2, sp, #320
+	sub	r2, r2, #276
+	ldr	r2, [r2]
 	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
-	add	r3, r3, r2
-	.loc 1 52 40
+	.loc 1 50 40
 	ldrd	r2, [r3]
-	.loc 1 52 20
-	ldrd	r0, [sp, #480]
+	.loc 1 50 20
+	ldrd	r0, [sp, #312]
 	bl	__aeabi_dsub
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #296]
-	.loc 1 53 37
-	ldr	r2, [sp, #428]
-	mov	r3, r2
-	lsls	r3, r3, #1
+	strd	r2, [sp, #160]
+	.loc 1 51 37
+	ldr	r3, [sp, #268]
+	lsls	r3, r3, #4
+	add	r2, sp, #320
+	sub	r2, r2, #276
+	ldr	r2, [r2]
 	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
-	add	r3, r3, r2
-	.loc 1 53 40
+	.loc 1 51 40
 	ldrd	r2, [r3, #8]
-	.loc 1 53 20
-	ldrd	r0, [sp, #472]
+	.loc 1 51 20
+	ldrd	r0, [sp, #304]
 	bl	__aeabi_dsub
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #288]
-	.loc 1 54 37
-	ldr	r2, [sp, #428]
-	mov	r3, r2
-	lsls	r3, r3, #1
-	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
-	add	r3, r3, r2
-	.loc 1 54 40
-	ldrd	r2, [r3, #16]
-	.loc 1 54 20
-	ldrd	r0, [sp, #464]
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #280]
-	.loc 1 56 31
-	ldrd	r2, [sp, #296]
-	ldrd	r0, [sp, #296]
+	strd	r2, [sp, #152]
+	.loc 1 53 31
+	ldrd	r2, [sp, #160]
+	ldrd	r0, [sp, #160]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 56 39
-	ldrd	r2, [sp, #288]
-	ldrd	r0, [sp, #288]
+	.loc 1 53 39
+	ldrd	r2, [sp, #152]
+	ldrd	r0, [sp, #152]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 56 35
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 56 47
-	ldrd	r2, [sp, #280]
-	ldrd	r0, [sp, #280]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 56 24
+	.loc 1 53 24
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
@@ -468,1409 +353,562 @@ tof_3d_localize:
 	vmov.f32	s0, s14
 	vmov.f32	s1, s15
 	bl	sqrt
-	vstr.64	d0, [sp, #416]
-	.loc 1 57 16
-	adr	r3, .L66+4
+	vstr.64	d0, [sp, #256]
+	.loc 1 54 16
+	adr	r3, .L60+24
 	ldrd	r2, [r3]
-	ldrd	r0, [sp, #416]
+	ldrd	r0, [sp, #256]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
 	beq	.L14
-	.loc 1 57 29 discriminator 1
-	adr	r3, .L66+4
+	.loc 1 54 29 discriminator 1
+	adr	r3, .L60+24
 	ldrd	r2, [r3]
-	strd	r2, [sp, #416]
+	strd	r2, [sp, #256]
 .L14:
-	.loc 1 59 39
-	ldr	r3, [sp, #428]
-	lsls	r2, r3, #3
-	add	r3, sp, #488
-	sub	r3, r3, #420
-	ldr	r3, [r3]
+	.loc 1 56 39
+	ldr	r3, [sp, #268]
+	lsls	r3, r3, #3
+	add	r2, sp, #320
+	sub	r2, r2, #284
+	ldr	r2, [r2]
 	add	r3, r3, r2
 	ldrd	r2, [r3]
-	.loc 1 59 20
-	ldrd	r0, [sp, #416]
+	.loc 1 56 20
+	ldrd	r0, [sp, #256]
 	bl	__aeabi_dsub
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #272]
-	.loc 1 60 30
-	ldrd	r2, [sp, #272]
+	strd	r2, [sp, #144]
+	.loc 1 57 30
+	ldrd	r2, [sp, #144]
+	ldrd	r0, [sp, #144]
+	bl	__aeabi_dmul
+	mov	r2, r0
+	mov	r3, r1
+	.loc 1 57 23
 	ldrd	r0, [sp, #272]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 60 23
-	ldrd	r0, [sp, #432]
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #432]
-	.loc 1 62 20
-	ldrd	r2, [sp, #416]
-	ldrd	r0, [sp, #296]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #264]
-	.loc 1 63 20
-	ldrd	r2, [sp, #416]
-	ldrd	r0, [sp, #288]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #256]
-	.loc 1 64 20
-	ldrd	r2, [sp, #416]
-	ldrd	r0, [sp, #280]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #248]
-	.loc 1 66 19
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r4, [r3]
-	.loc 1 66 29
-	ldrd	r2, [sp, #264]
-	ldrd	r0, [sp, #264]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 66 23
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3]
-	.loc 1 66 41
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r4, [r3, #8]
-	.loc 1 66 51
+	strd	r2, [sp, #272]
+	.loc 1 59 20
 	ldrd	r2, [sp, #256]
-	ldrd	r0, [sp, #264]
+	ldrd	r0, [sp, #160]
+	bl	__aeabi_ddiv
+	mov	r2, r0
+	mov	r3, r1
+	strd	r2, [sp, #136]
+	.loc 1 60 20
+	ldrd	r2, [sp, #256]
+	ldrd	r0, [sp, #152]
+	bl	__aeabi_ddiv
+	mov	r2, r0
+	mov	r3, r1
+	strd	r2, [sp, #128]
+	.loc 1 62 19
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r4, [r3]
+	.loc 1 62 29
+	ldrd	r2, [sp, #136]
+	ldrd	r0, [sp, #136]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 66 45
+	.loc 1 62 23
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #8]
-	.loc 1 66 63
-	add	r3, sp, #488
-	sub	r3, r3, #408
+	add	r1, sp, #320
+	sub	r1, r1, #272
+	strd	r2, [r1]
+	.loc 1 62 41
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r4, [r3, #8]
+	.loc 1 62 51
+	ldrd	r2, [sp, #128]
+	ldrd	r0, [sp, #136]
+	bl	__aeabi_dmul
+	mov	r2, r0
+	mov	r3, r1
+	.loc 1 62 45
+	mov	r0, r4
+	mov	r1, r5
+	bl	__aeabi_dadd
+	mov	r2, r0
+	mov	r3, r1
+	add	r1, sp, #320
+	sub	r1, r1, #272
+	strd	r2, [r1, #8]
+	.loc 1 63 19
+	add	r3, sp, #320
+	sub	r3, r3, #272
 	ldrd	r4, [r3, #16]
-	.loc 1 66 73
-	ldrd	r2, [sp, #248]
-	ldrd	r0, [sp, #264]
+	.loc 1 63 29
+	ldrd	r2, [sp, #136]
+	ldrd	r0, [sp, #128]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 66 67
+	.loc 1 63 23
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #16]
-	.loc 1 67 19
-	add	r3, sp, #488
-	sub	r3, r3, #408
+	add	r1, sp, #320
+	sub	r1, r1, #272
+	strd	r2, [r1, #16]
+	.loc 1 63 41
+	add	r3, sp, #320
+	sub	r3, r3, #272
 	ldrd	r4, [r3, #24]
-	.loc 1 67 29
-	ldrd	r2, [sp, #264]
-	ldrd	r0, [sp, #256]
+	.loc 1 63 51
+	ldrd	r2, [sp, #128]
+	ldrd	r0, [sp, #128]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 67 23
+	.loc 1 63 45
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #24]
-	.loc 1 67 41
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r4, [r3, #32]
-	.loc 1 67 51
-	ldrd	r2, [sp, #256]
-	ldrd	r0, [sp, #256]
+	add	r1, sp, #320
+	sub	r1, r1, #272
+	strd	r2, [r1, #24]
+	.loc 1 65 16
+	ldrd	r4, [sp, #112]
+	.loc 1 65 26
+	ldrd	r2, [sp, #144]
+	ldrd	r0, [sp, #136]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 67 45
+	.loc 1 65 20
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #32]
-	.loc 1 67 63
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r4, [r3, #40]
-	.loc 1 67 73
-	ldrd	r2, [sp, #248]
-	ldrd	r0, [sp, #256]
+	strd	r2, [sp, #112]
+	.loc 1 66 16
+	ldrd	r4, [sp, #120]
+	.loc 1 66 26
+	ldrd	r2, [sp, #144]
+	ldrd	r0, [sp, #128]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 67 67
+	.loc 1 66 20
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #40]
-	.loc 1 68 19
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r4, [r3, #48]
-	.loc 1 68 29
-	ldrd	r2, [sp, #264]
-	ldrd	r0, [sp, #248]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 68 23
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #48]
-	.loc 1 68 41
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r4, [r3, #56]
-	.loc 1 68 51
-	ldrd	r2, [sp, #256]
-	ldrd	r0, [sp, #248]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 68 45
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #56]
-	.loc 1 68 63
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r4, [r3, #64]
-	.loc 1 68 73
-	ldrd	r2, [sp, #248]
-	ldrd	r0, [sp, #248]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 68 67
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #64]
-	.loc 1 70 16
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r4, [r3]
-	.loc 1 70 26
-	ldrd	r2, [sp, #272]
-	ldrd	r0, [sp, #264]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 70 20
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	strd	r0, [r3]
-	.loc 1 71 16
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r4, [r3, #8]
-	.loc 1 71 26
-	ldrd	r2, [sp, #272]
-	ldrd	r0, [sp, #256]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 71 20
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	strd	r0, [r3, #8]
-	.loc 1 72 16
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r4, [r3, #16]
-	.loc 1 72 26
-	ldrd	r2, [sp, #272]
-	ldrd	r0, [sp, #248]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 72 20
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	strd	r0, [r3, #16]
+	strd	r2, [sp, #120]
 .LBE6:
-	.loc 1 50 43 discriminator 2
-	ldr	r3, [sp, #428]
+	.loc 1 48 43 discriminator 2
+	ldr	r3, [sp, #268]
 	adds	r3, r3, #1
-	str	r3, [sp, #428]
+	str	r3, [sp, #268]
 .L13:
-	.loc 1 50 27 discriminator 1
-	add	r3, sp, #488
-	sub	r3, r3, #416
-	ldr	r2, [sp, #428]
+	.loc 1 48 27 discriminator 1
+	add	r3, sp, #320
+	sub	r3, r3, #280
+	ldr	r2, [sp, #268]
 	ldr	r3, [r3]
 	cmp	r2, r3
 	blt	.L16
 .LBE5:
-	.loc 1 76 15
-	add	r3, sp, #488
-	sub	r3, r3, #408
+	.loc 1 70 15
+	add	r3, sp, #320
+	sub	r3, r3, #272
 	ldrd	r0, [r3]
-	.loc 1 76 19
-	ldrd	r2, [sp, #448]
+	.loc 1 70 19
+	ldrd	r2, [sp, #288]
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3]
-	.loc 1 77 15
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #32]
-	.loc 1 77 19
-	ldrd	r2, [sp, #448]
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #32]
-	.loc 1 78 15
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #64]
-	.loc 1 78 19
-	ldrd	r2, [sp, #448]
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	strd	r0, [r3, #64]
-	.loc 1 81 28
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r6, [r3]
-	.loc 1 81 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #32]
-	.loc 1 81 49
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #64]
-	.loc 1 81 42
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 81 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #40]
-	.loc 1 81 71
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #56]
-	.loc 1 81 64
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 81 53
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 81 31
-	mov	r0, r6
-	mov	r1, r7
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r8, r2
-	mov	r9, r3
-	.loc 1 82 28
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r6, [r3, #8]
-	.loc 1 82 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
+	add	r1, sp, #320
+	sub	r1, r1, #272
+	strd	r2, [r1]
+	.loc 1 71 15
+	add	r3, sp, #320
+	sub	r3, r3, #272
 	ldrd	r0, [r3, #24]
-	.loc 1 82 49
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #64]
-	.loc 1 82 42
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 82 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #40]
-	.loc 1 82 71
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #48]
-	.loc 1 82 64
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 82 53
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 82 31
-	mov	r0, r6
-	mov	r1, r7
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 82 20
-	mov	r0, r8
-	mov	r1, r9
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	mov	r8, r2
-	mov	r9, r3
-	.loc 1 83 28
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r6, [r3, #16]
-	.loc 1 83 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #24]
-	.loc 1 83 49
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #56]
-	.loc 1 83 42
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 83 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #32]
-	.loc 1 83 71
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #48]
-	.loc 1 83 64
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 83 53
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 83 31
-	mov	r0, r6
-	mov	r1, r7
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 81 16
-	mov	r0, r8
-	mov	r1, r9
+	.loc 1 71 19
+	ldrd	r2, [sp, #288]
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #368]
-	.loc 1 85 13
-	ldr	r3, [sp, #368]
+	add	r1, sp, #320
+	sub	r1, r1, #272
+	strd	r2, [r1, #24]
+	.loc 1 74 28
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r0, [r3]
+	.loc 1 74 38
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r2, [r3, #24]
+	.loc 1 74 31
+	bl	__aeabi_dmul
+	mov	r2, r0
+	mov	r3, r1
+	mov	r4, r2
+	mov	r5, r3
+	.loc 1 74 50
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r0, [r3, #8]
+	.loc 1 74 60
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r2, [r3, #16]
+	.loc 1 74 53
+	bl	__aeabi_dmul
+	mov	r2, r0
+	mov	r3, r1
+	.loc 1 74 16
+	mov	r0, r4
+	mov	r1, r5
+	bl	__aeabi_dsub
+	mov	r2, r0
+	mov	r3, r1
+	strd	r2, [sp, #216]
+	.loc 1 76 13
+	ldr	r3, [sp, #216]
 	str	r3, [sp]
-	ldr	r3, [sp, #372]
+	ldr	r3, [sp, #220]
 	bic	r3, r3, #-2147483648
 	str	r3, [sp, #4]
-	.loc 1 85 12
-	adr	r3, .L66+4
+	.loc 1 76 12
+	adr	r3, .L60+24
 	ldrd	r2, [r3]
 	ldrd	r0, [sp]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
-	beq	.L59
-	.loc 1 86 20
+	beq	.L53
+	.loc 1 77 20
 	mov	r2, #0
-	ldr	r3, .L66
-	ldrd	r0, [sp, #448]
+	ldr	r3, .L60+16
+	ldrd	r0, [sp, #288]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #448]
-	.loc 1 87 13
-	b	.L45
-.L67:
-	.align	3
-.L66:
-	.word	1075052544
-	.word	-1598689907
-	.word	1051772663
-.L59:
-	.loc 1 92 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #32]
-	.loc 1 92 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #64]
-	.loc 1 92 32
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 92 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #40]
-	.loc 1 92 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #56]
-	.loc 1 92 54
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 92 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 92 66
-	ldrd	r2, [sp, #368]
+	strd	r2, [sp, #288]
+	.loc 1 78 13
+	b	.L41
+.L53:
+	.loc 1 83 28
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r0, [r3, #24]
+	.loc 1 83 32
+	ldrd	r2, [sp, #216]
 	bl	__aeabi_ddiv
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 92 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3]
-	.loc 1 93 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #8]
-	.loc 1 93 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #64]
-	.loc 1 93 32
-	bl	__aeabi_dmul
+	.loc 1 83 19
+	strd	r2, [sp, #80]
+	.loc 1 84 28
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r2, [r3, #8]
+	.loc 1 84 21
+	mov	r10, r2
+	eor	fp, r3, #-2147483648
+	.loc 1 84 32
+	ldrd	r2, [sp, #216]
+	mov	r0, r10
+	mov	r1, fp
+	bl	__aeabi_ddiv
 	mov	r2, r0
 	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 93 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #16]
-	.loc 1 93 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #56]
-	.loc 1 93 54
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 93 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 93 21
+	.loc 1 84 19
+	strd	r2, [sp, #88]
+	.loc 1 85 28
+	add	r3, sp, #320
+	sub	r3, r3, #272
+	ldrd	r2, [r3, #16]
+	.loc 1 85 21
 	str	r2, [sp, #8]
 	eor	r3, r3, #-2147483648
 	str	r3, [sp, #12]
-	.loc 1 93 66
-	ldrd	r2, [sp, #368]
+	.loc 1 85 32
+	ldrd	r2, [sp, #216]
 	ldrd	r0, [sp, #8]
 	bl	__aeabi_ddiv
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 93 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3, #8]
-	.loc 1 94 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #8]
-	.loc 1 94 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #40]
-	.loc 1 94 32
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 94 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #16]
-	.loc 1 94 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #32]
-	.loc 1 94 54
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 94 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 94 66
-	ldrd	r2, [sp, #368]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 94 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3, #16]
-	.loc 1 96 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #24]
-	.loc 1 96 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #64]
-	.loc 1 96 32
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 96 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #40]
-	.loc 1 96 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #48]
-	.loc 1 96 54
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 96 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 96 21
-	str	r2, [sp, #16]
-	eor	r3, r3, #-2147483648
-	str	r3, [sp, #20]
-	.loc 1 96 66
-	ldrd	r2, [sp, #368]
-	ldrd	r0, [sp, #16]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 96 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3, #24]
-	.loc 1 97 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
+	.loc 1 85 19
+	strd	r2, [sp, #96]
+	.loc 1 86 28
+	add	r3, sp, #320
+	sub	r3, r3, #272
 	ldrd	r0, [r3]
-	.loc 1 97 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #64]
-	.loc 1 97 32
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 97 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #16]
-	.loc 1 97 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #48]
-	.loc 1 97 54
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 97 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 97 66
-	ldrd	r2, [sp, #368]
+	.loc 1 86 32
+	ldrd	r2, [sp, #216]
 	bl	__aeabi_ddiv
 	mov	r2, r0
 	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 97 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3, #32]
-	.loc 1 98 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3]
-	.loc 1 98 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #40]
-	.loc 1 98 32
+	.loc 1 86 19
+	strd	r2, [sp, #104]
+	.loc 1 88 34
+	ldrd	r0, [sp, #80]
+	.loc 1 88 41
+	ldrd	r2, [sp, #112]
+	.loc 1 88 37
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 98 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #16]
-	.loc 1 98 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #24]
-	.loc 1 98 54
+	.loc 1 88 53
+	ldrd	r0, [sp, #88]
+	.loc 1 88 60
+	ldrd	r2, [sp, #120]
+	.loc 1 88 56
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 98 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 98 21
-	str	r2, [sp, #24]
-	eor	r3, r3, #-2147483648
-	str	r3, [sp, #28]
-	.loc 1 98 66
-	ldrd	r2, [sp, #368]
-	ldrd	r0, [sp, #24]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 98 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3, #40]
-	.loc 1 100 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #24]
-	.loc 1 100 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #56]
-	.loc 1 100 32
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 100 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #32]
-	.loc 1 100 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #48]
-	.loc 1 100 54
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 100 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 100 66
-	ldrd	r2, [sp, #368]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 100 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3, #48]
-	.loc 1 101 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3]
-	.loc 1 101 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #56]
-	.loc 1 101 32
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 101 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #8]
-	.loc 1 101 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #48]
-	.loc 1 101 54
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 101 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 101 21
-	str	r2, [sp, #32]
-	eor	r3, r3, #-2147483648
-	str	r3, [sp, #36]
-	.loc 1 101 66
-	ldrd	r2, [sp, #368]
-	ldrd	r0, [sp, #32]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 101 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3, #56]
-	.loc 1 102 29
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3]
-	.loc 1 102 39
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #32]
-	.loc 1 102 32
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 102 51
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r0, [r3, #8]
-	.loc 1 102 61
-	add	r3, sp, #488
-	sub	r3, r3, #408
-	ldrd	r2, [r3, #24]
-	.loc 1 102 54
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 102 43
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 102 66
-	ldrd	r2, [sp, #368]
-	bl	__aeabi_ddiv
-	mov	r2, r0
-	mov	r3, r1
-	mov	r0, r2
-	mov	r1, r3
-	.loc 1 102 19
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	strd	r0, [r3, #64]
-	.loc 1 104 34
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3]
-	.loc 1 104 41
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r2, [r3]
-	.loc 1 104 37
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 104 53
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3, #8]
-	.loc 1 104 60
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r2, [r3, #8]
-	.loc 1 104 56
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 104 45
+	.loc 1 88 45
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 104 72
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3, #16]
-	.loc 1 104 79
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r2, [r3, #16]
-	.loc 1 104 75
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 104 64
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 104 16
+	.loc 1 88 16
 	mov	r1, r2
-	str	r1, [sp, #408]
+	str	r1, [sp, #248]
 	eor	r3, r3, #-2147483648
-	str	r3, [sp, #412]
-	.loc 1 105 34
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3, #24]
-	.loc 1 105 41
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r2, [r3]
-	.loc 1 105 37
+	str	r3, [sp, #252]
+	.loc 1 89 34
+	ldrd	r0, [sp, #96]
+	.loc 1 89 41
+	ldrd	r2, [sp, #112]
+	.loc 1 89 37
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 105 53
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3, #32]
-	.loc 1 105 60
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r2, [r3, #8]
-	.loc 1 105 56
+	.loc 1 89 53
+	ldrd	r0, [sp, #104]
+	.loc 1 89 60
+	ldrd	r2, [sp, #120]
+	.loc 1 89 56
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 105 45
+	.loc 1 89 45
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 105 72
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3, #40]
-	.loc 1 105 79
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r2, [r3, #16]
-	.loc 1 105 75
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 105 64
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 105 16
+	.loc 1 89 16
 	mov	r1, r2
-	str	r1, [sp, #400]
+	str	r1, [sp, #240]
 	eor	r3, r3, #-2147483648
-	str	r3, [sp, #404]
-	.loc 1 106 34
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3, #48]
-	.loc 1 106 41
-	add	r3, sp, #488
-	sub	r3, r3, #264
+	str	r3, [sp, #244]
+	.loc 1 92 12
+	adr	r3, .L60
 	ldrd	r2, [r3]
-	.loc 1 106 37
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 106 53
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3, #56]
-	.loc 1 106 60
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r2, [r3, #8]
-	.loc 1 106 56
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 106 45
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 106 72
-	add	r3, sp, #488
-	sub	r3, r3, #336
-	ldrd	r0, [r3, #64]
-	.loc 1 106 79
-	add	r3, sp, #488
-	sub	r3, r3, #264
-	ldrd	r2, [r3, #16]
-	.loc 1 106 75
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 106 64
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 106 16
-	mov	r1, r2
-	str	r1, [sp, #392]
-	eor	r3, r3, #-2147483648
-	str	r3, [sp, #396]
-	.loc 1 109 12
-	adr	r3, .L68+32
-	ldrd	r2, [r3]
-	ldrd	r0, [sp, #408]
+	ldrd	r0, [sp, #248]
 	bl	__aeabi_dcmpgt
 	mov	r3, r0
 	cmp	r3, #0
 	beq	.L20
-	.loc 1 109 43 discriminator 1
-	adr	r3, .L68+32
+	.loc 1 92 43 discriminator 1
+	adr	r3, .L60
 	ldrd	r2, [r3]
-	strd	r2, [sp, #408]
+	strd	r2, [sp, #248]
 .L20:
-	.loc 1 110 12
-	adr	r3, .L68+40
+	.loc 1 93 12
+	adr	r3, .L60+8
 	ldrd	r2, [r3]
-	ldrd	r0, [sp, #408]
+	ldrd	r0, [sp, #248]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
 	beq	.L22
-	.loc 1 110 44 discriminator 1
-	adr	r3, .L68+40
+	.loc 1 93 44 discriminator 1
+	adr	r3, .L60+8
 	ldrd	r2, [r3]
-	strd	r2, [sp, #408]
+	strd	r2, [sp, #248]
 .L22:
-	.loc 1 111 12
-	adr	r3, .L68+32
+	.loc 1 94 12
+	adr	r3, .L60
 	ldrd	r2, [r3]
-	ldrd	r0, [sp, #400]
+	ldrd	r0, [sp, #240]
 	bl	__aeabi_dcmpgt
 	mov	r3, r0
 	cmp	r3, #0
 	beq	.L24
-	.loc 1 111 43 discriminator 1
-	adr	r3, .L68+32
+	.loc 1 94 43 discriminator 1
+	adr	r3, .L60
 	ldrd	r2, [r3]
-	strd	r2, [sp, #400]
+	strd	r2, [sp, #240]
 .L24:
-	.loc 1 112 12
-	adr	r3, .L68+40
+	.loc 1 95 12
+	adr	r3, .L60+8
 	ldrd	r2, [r3]
-	ldrd	r0, [sp, #400]
+	ldrd	r0, [sp, #240]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
 	beq	.L26
-	.loc 1 112 44 discriminator 1
-	adr	r3, .L68+40
+	.loc 1 95 44 discriminator 1
+	adr	r3, .L60+8
 	ldrd	r2, [r3]
-	strd	r2, [sp, #400]
+	strd	r2, [sp, #240]
 .L26:
-	.loc 1 113 12
-	adr	r3, .L68+32
-	ldrd	r2, [r3]
-	ldrd	r0, [sp, #392]
+	.loc 1 97 16
+	ldrd	r2, [sp, #248]
+	ldrd	r0, [sp, #312]
+	bl	__aeabi_dadd
+	mov	r2, r0
+	mov	r3, r1
+	strd	r2, [sp, #208]
+	.loc 1 98 16
+	ldrd	r2, [sp, #240]
+	ldrd	r0, [sp, #304]
+	bl	__aeabi_dadd
+	mov	r2, r0
+	mov	r3, r1
+	strd	r2, [sp, #200]
+	.loc 1 101 13
+	vldr.64	d0, [sp, #208]
+	bl	__SEGGER_RTL_float64_isnan
+	mov	r3, r0
+	.loc 1 101 12 discriminator 1
+	cmp	r3, #0
+	bne	.L28
+	.loc 1 101 30 discriminator 2
+	vldr.64	d0, [sp, #200]
+	bl	__SEGGER_RTL_float64_isnan
+	mov	r3, r0
+	.loc 1 101 27 discriminator 1
+	cmp	r3, #0
+	bne	.L28
+	.loc 1 102 13
+	ldr	r3, [sp, #208]
+	str	r3, [sp, #16]
+	ldr	r3, [sp, #212]
+	bic	r3, r3, #-2147483648
+	str	r3, [sp, #20]
+	.loc 1 101 44 discriminator 4
+	mov	r2, #0
+	ldr	r3, .L60+20
+	ldrd	r0, [sp, #16]
 	bl	__aeabi_dcmpgt
 	mov	r3, r0
 	cmp	r3, #0
-	beq	.L28
-	.loc 1 113 43 discriminator 1
-	adr	r3, .L68+32
-	ldrd	r2, [r3]
-	strd	r2, [sp, #392]
+	bne	.L28
+	.loc 1 102 39
+	ldr	r3, [sp, #200]
+	str	r3, [sp, #24]
+	ldr	r3, [sp, #204]
+	bic	r3, r3, #-2147483648
+	str	r3, [sp, #28]
+	.loc 1 102 36
+	mov	r2, #0
+	ldr	r3, .L60+20
+	ldrd	r0, [sp, #24]
+	bl	__aeabi_dcmpgt
+	mov	r3, r0
+	cmp	r3, #0
+	beq	.L54
 .L28:
-	.loc 1 114 12
-	adr	r3, .L68+40
-	ldrd	r2, [r3]
-	ldrd	r0, [sp, #392]
-	bl	__aeabi_dcmplt
-	mov	r3, r0
-	cmp	r3, #0
-	beq	.L30
-	.loc 1 114 44 discriminator 1
-	adr	r3, .L68+40
-	ldrd	r2, [r3]
-	strd	r2, [sp, #392]
-.L30:
-	.loc 1 116 16
-	ldrd	r2, [sp, #408]
-	ldrd	r0, [sp, #480]
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #360]
-	.loc 1 117 16
-	ldrd	r2, [sp, #400]
-	ldrd	r0, [sp, #472]
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #352]
-	.loc 1 118 16
-	ldrd	r2, [sp, #392]
-	ldrd	r0, [sp, #464]
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #344]
-	.loc 1 121 13
-	vldr.64	d0, [sp, #360]
-	bl	__SEGGER_RTL_float64_isnan
-	mov	r3, r0
-	.loc 1 121 12 discriminator 1
-	cmp	r3, #0
-	bne	.L32
-	.loc 1 121 30 discriminator 2
-	vldr.64	d0, [sp, #352]
-	bl	__SEGGER_RTL_float64_isnan
-	mov	r3, r0
-	.loc 1 121 27 discriminator 1
-	cmp	r3, #0
-	bne	.L32
-	.loc 1 121 47 discriminator 4
-	vldr.64	d0, [sp, #344]
-	bl	__SEGGER_RTL_float64_isnan
-	mov	r3, r0
-	.loc 1 121 44 discriminator 1
-	cmp	r3, #0
-	bne	.L32
-	.loc 1 122 13
-	ldr	r3, [sp, #360]
-	str	r3, [sp, #40]
-	ldr	r3, [sp, #364]
-	bic	r3, r3, #-2147483648
-	str	r3, [sp, #44]
-	.loc 1 121 61 discriminator 6
+	.loc 1 104 20
 	mov	r2, #0
-	ldr	r3, .L68+24
-	ldrd	r0, [sp, #40]
-	bl	__aeabi_dcmpgt
-	mov	r3, r0
-	cmp	r3, #0
-	bne	.L32
-	.loc 1 122 39
-	ldr	r3, [sp, #352]
-	str	r3, [sp, #48]
-	ldr	r3, [sp, #356]
-	bic	r3, r3, #-2147483648
-	str	r3, [sp, #52]
-	.loc 1 122 36
-	mov	r2, #0
-	ldr	r3, .L68+24
-	ldrd	r0, [sp, #48]
-	bl	__aeabi_dcmpgt
-	mov	r3, r0
-	cmp	r3, #0
-	bne	.L32
-	.loc 1 122 65 discriminator 1
-	ldr	r3, [sp, #344]
-	str	r3, [sp, #56]
-	ldr	r3, [sp, #348]
-	bic	r3, r3, #-2147483648
-	str	r3, [sp, #60]
-	.loc 1 122 62 discriminator 1
-	mov	r2, #0
-	ldr	r3, .L68+24
-	ldrd	r0, [sp, #56]
-	bl	__aeabi_dcmpgt
-	mov	r3, r0
-	cmp	r3, #0
-	beq	.L60
-.L32:
-	.loc 1 124 20
-	mov	r2, #0
-	ldr	r3, .L68+28
-	ldrd	r0, [sp, #448]
+	ldr	r3, .L60+16
+	ldrd	r0, [sp, #288]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #448]
-	.loc 1 125 13
-	b	.L45
-.L60:
-	.loc 1 129 16
+	strd	r2, [sp, #288]
+	.loc 1 105 13
+	b	.L41
+.L54:
+	.loc 1 109 16
 	mov	r2, #0
 	mov	r3, #0
-	strd	r2, [sp, #384]
+	strd	r2, [sp, #232]
 .LBB7:
-	.loc 1 130 18
+	.loc 1 110 18
 	movs	r3, #0
-	str	r3, [sp, #380]
-	.loc 1 130 9
-	b	.L35
-.L36:
+	str	r3, [sp, #228]
+	.loc 1 110 9
+	b	.L31
+.L61:
+	.align	3
+.L60:
+	.word	858993459
+	.word	1069757235
+	.word	858993459
+	.word	-1077726413
+	.word	1075052544
+	.word	1079574528
+	.word	-1598689907
+	.word	1051772663
+.L32:
 .LBB8:
-	.loc 1 131 37
-	ldr	r2, [sp, #380]
-	mov	r3, r2
-	lsls	r3, r3, #1
+	.loc 1 111 37
+	ldr	r3, [sp, #228]
+	lsls	r3, r3, #4
+	add	r2, sp, #320
+	sub	r2, r2, #276
+	ldr	r2, [r2]
 	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
-	add	r3, r3, r2
-	.loc 1 131 40
+	.loc 1 111 40
 	ldrd	r2, [r3]
-	.loc 1 131 20
-	ldrd	r0, [sp, #360]
+	.loc 1 111 20
+	ldrd	r0, [sp, #208]
 	bl	__aeabi_dsub
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #336]
-	.loc 1 132 37
-	ldr	r2, [sp, #380]
-	mov	r3, r2
-	lsls	r3, r3, #1
+	strd	r2, [sp, #192]
+	.loc 1 112 37
+	ldr	r3, [sp, #228]
+	lsls	r3, r3, #4
+	add	r2, sp, #320
+	sub	r2, r2, #276
+	ldr	r2, [r2]
 	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
-	add	r3, r3, r2
-	.loc 1 132 40
+	.loc 1 112 40
 	ldrd	r2, [r3, #8]
-	.loc 1 132 20
-	ldrd	r0, [sp, #352]
+	.loc 1 112 20
+	ldrd	r0, [sp, #200]
 	bl	__aeabi_dsub
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #328]
-	.loc 1 133 37
-	ldr	r2, [sp, #380]
-	mov	r3, r2
-	lsls	r3, r3, #1
-	add	r3, r3, r2
-	lsls	r3, r3, #3
-	mov	r2, r3
-	add	r3, sp, #488
-	sub	r3, r3, #412
-	ldr	r3, [r3]
-	add	r3, r3, r2
-	.loc 1 133 40
-	ldrd	r2, [r3, #16]
-	.loc 1 133 20
-	ldrd	r0, [sp, #344]
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #320]
-	.loc 1 134 32
-	ldrd	r2, [sp, #336]
-	ldrd	r0, [sp, #336]
+	strd	r2, [sp, #184]
+	.loc 1 113 32
+	ldrd	r2, [sp, #192]
+	ldrd	r0, [sp, #192]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 134 40
-	ldrd	r2, [sp, #328]
-	ldrd	r0, [sp, #328]
+	.loc 1 113 40
+	ldrd	r2, [sp, #184]
+	ldrd	r0, [sp, #184]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 134 36
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 134 48
-	ldrd	r2, [sp, #320]
-	ldrd	r0, [sp, #320]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 134 25
+	.loc 1 113 25
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
@@ -1880,113 +918,96 @@ tof_3d_localize:
 	vmov.f32	s0, s14
 	vmov.f32	s1, s15
 	bl	sqrt
-	vstr.64	d0, [sp, #312]
-	.loc 1 135 40
-	ldr	r3, [sp, #380]
-	lsls	r2, r3, #3
-	add	r3, sp, #488
-	sub	r3, r3, #420
-	ldr	r3, [r3]
+	vstr.64	d0, [sp, #176]
+	.loc 1 114 40
+	ldr	r3, [sp, #228]
+	lsls	r3, r3, #3
+	add	r2, sp, #320
+	sub	r2, r2, #284
+	ldr	r2, [r2]
 	add	r3, r3, r2
 	ldrd	r2, [r3]
-	.loc 1 135 20
-	ldrd	r0, [sp, #312]
+	.loc 1 114 20
+	ldrd	r0, [sp, #176]
 	bl	__aeabi_dsub
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #304]
-	.loc 1 136 30
-	ldrd	r2, [sp, #304]
-	ldrd	r0, [sp, #304]
+	strd	r2, [sp, #168]
+	.loc 1 115 30
+	ldrd	r2, [sp, #168]
+	ldrd	r0, [sp, #168]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 136 23
-	ldrd	r0, [sp, #384]
+	.loc 1 115 23
+	ldrd	r0, [sp, #232]
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #384]
+	strd	r2, [sp, #232]
 .LBE8:
-	.loc 1 130 43 discriminator 3
-	ldr	r3, [sp, #380]
+	.loc 1 110 43 discriminator 3
+	ldr	r3, [sp, #228]
 	adds	r3, r3, #1
-	str	r3, [sp, #380]
-.L35:
-	.loc 1 130 27 discriminator 1
-	add	r3, sp, #488
-	sub	r3, r3, #416
-	ldr	r2, [sp, #380]
+	str	r3, [sp, #228]
+.L31:
+	.loc 1 110 27 discriminator 1
+	add	r3, sp, #320
+	sub	r3, r3, #280
+	ldr	r2, [sp, #228]
 	ldr	r3, [r3]
 	cmp	r2, r3
-	blt	.L36
+	blt	.L32
 .LBE7:
-	.loc 1 140 12
-	ldrd	r2, [sp, #432]
-	ldrd	r0, [sp, #384]
+	.loc 1 119 12
+	ldrd	r2, [sp, #272]
+	ldrd	r0, [sp, #232]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
-	beq	.L61
-	.loc 1 141 20
-	ldrd	r2, [sp, #360]
-	strd	r2, [sp, #480]
-	.loc 1 142 20
-	ldrd	r2, [sp, #352]
-	strd	r2, [sp, #472]
-	.loc 1 143 20
-	ldrd	r2, [sp, #344]
-	strd	r2, [sp, #464]
-	.loc 1 145 20
-	adr	r3, .L68
+	beq	.L55
+	.loc 1 120 20
+	ldrd	r2, [sp, #208]
+	strd	r2, [sp, #312]
+	.loc 1 121 20
+	ldrd	r2, [sp, #200]
+	strd	r2, [sp, #304]
+	.loc 1 123 20
+	adr	r3, .L62
 	ldrd	r2, [r3]
-	ldrd	r0, [sp, #448]
+	ldrd	r0, [sp, #288]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #448]
-	.loc 1 146 16
-	adr	r3, .L68+8
+	strd	r2, [sp, #288]
+	.loc 1 124 16
+	adr	r3, .L62+8
 	ldrd	r2, [r3]
-	ldrd	r0, [sp, #448]
+	ldrd	r0, [sp, #288]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
-	beq	.L39
-	.loc 1 146 39 discriminator 1
-	adr	r3, .L68+8
+	beq	.L35
+	.loc 1 124 39 discriminator 1
+	adr	r3, .L62+8
 	ldrd	r2, [r3]
-	strd	r2, [sp, #448]
-.L39:
-	.loc 1 148 29
-	ldrd	r2, [sp, #408]
-	ldrd	r0, [sp, #408]
+	strd	r2, [sp, #288]
+.L35:
+	.loc 1 126 29
+	ldrd	r2, [sp, #248]
+	ldrd	r0, [sp, #248]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 148 47
-	ldrd	r2, [sp, #400]
-	ldrd	r0, [sp, #400]
+	.loc 1 126 47
+	ldrd	r2, [sp, #240]
+	ldrd	r0, [sp, #240]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 148 38
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 148 65
-	ldrd	r2, [sp, #392]
-	ldrd	r0, [sp, #392]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 148 17
+	.loc 1 126 17
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
@@ -1997,105 +1018,90 @@ tof_3d_localize:
 	vmov.f32	s1, s15
 	bl	sqrt
 	vmov	r0, r1, d0
-	.loc 1 148 16 discriminator 1
-	adr	r3, .L68+16
+	.loc 1 126 16 discriminator 1
+	adr	r3, .L62+16
 	ldrd	r2, [r3]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
-	bne	.L62
-	b	.L45
-.L69:
+	bne	.L56
+	b	.L41
+.L55:
+	.loc 1 129 20
+	ldrd	r0, [sp, #288]
+	mov	r2, r0
+	mov	r3, r1
+	bl	__aeabi_dadd
+	mov	r2, r0
+	mov	r3, r1
+	strd	r2, [sp, #288]
+	.loc 1 130 16
+	adr	r3, .L62+24
+	ldrd	r2, [r3]
+	ldrd	r0, [sp, #288]
+	bl	__aeabi_dcmpgt
+	mov	r3, r0
+	cmp	r3, #0
+	bne	.L57
+.L41:
+.LBE4:
+	.loc 1 41 43 discriminator 2
+	ldr	r3, [sp, #284]
+	adds	r3, r3, #1
+	str	r3, [sp, #284]
+.L12:
+	.loc 1 41 29 discriminator 1
+	ldr	r2, [sp, #284]
+	ldr	r3, [sp, #224]
+	cmp	r2, r3
+	blt	.L43
+	b	.L42
+.L56:
+.LBB9:
+	.loc 1 127 17
+	nop
+	b	.L42
+.L57:
+	.loc 1 131 17
+	nop
+.L42:
+.LBE9:
+.LBE3:
+	.loc 1 135 16
+	add	r3, sp, #320
+	sub	r3, r3, #288
+	ldr	r1, [r3]
+	ldrd	r2, [sp, #312]
+	strd	r2, [r1]
+	.loc 1 136 16
+	add	r3, sp, #320
+	sub	r3, r3, #288
+	ldr	r1, [r3]
+	ldrd	r2, [sp, #304]
+	strd	r2, [r1, #8]
+	.loc 1 138 12
+	movs	r3, #1
+.L4:
+	.loc 1 139 1
+	mov	r0, r3
+	add	sp, sp, #324
+	.cfi_def_cfa_offset 36
+	@ sp needed
+	pop	{r4, r5, r6, r7, r8, r9, r10, fp, pc}
+.L63:
 	.align	3
-.L68:
+.L62:
 	.word	1717986918
 	.word	1072064102
 	.word	-1998362383
 	.word	1055193269
 	.word	-350469331
 	.word	1058682594
-	.word	1079574528
-	.word	1075052544
-	.word	858993459
-	.word	1069757235
-	.word	858993459
-	.word	-1077726413
-.L61:
-	.loc 1 151 20
-	ldrd	r0, [sp, #448]
-	mov	r2, r0
-	mov	r3, r1
-	bl	__aeabi_dadd
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #448]
-	.loc 1 152 16
-	adr	r3, .L70
-	ldrd	r2, [r3]
-	ldrd	r0, [sp, #448]
-	bl	__aeabi_dcmpgt
-	mov	r3, r0
-	cmp	r3, #0
-	bne	.L63
-.L45:
-.LBE4:
-	.loc 1 43 43 discriminator 2
-	ldr	r3, [sp, #444]
-	adds	r3, r3, #1
-	str	r3, [sp, #444]
-.L12:
-	.loc 1 43 29 discriminator 1
-	ldr	r2, [sp, #444]
-	ldr	r3, [sp, #376]
-	cmp	r2, r3
-	blt	.L47
-	b	.L46
-.L62:
-.LBB9:
-	.loc 1 149 17
-	nop
-	b	.L46
-.L63:
-	.loc 1 153 17
-	nop
-.L46:
-.LBE9:
-.LBE3:
-	.loc 1 157 16
-	add	r3, sp, #488
-	sub	r3, r3, #424
-	ldr	r1, [r3]
-	ldrd	r2, [sp, #480]
-	strd	r2, [r1]
-	.loc 1 158 16
-	add	r3, sp, #488
-	sub	r3, r3, #424
-	ldr	r1, [r3]
-	ldrd	r2, [sp, #472]
-	strd	r2, [r1, #8]
-	.loc 1 159 16
-	add	r3, sp, #488
-	sub	r3, r3, #424
-	ldr	r1, [r3]
-	ldrd	r2, [sp, #464]
-	strd	r2, [r1, #16]
-	.loc 1 161 12
-	movs	r3, #1
-.L4:
-	.loc 1 162 1
-	mov	r0, r3
-	add	sp, sp, #492
-	.cfi_def_cfa_offset 36
-	@ sp needed
-	pop	{r4, r5, r6, r7, r8, r9, r10, fp, pc}
-.L71:
-	.align	3
-.L70:
 	.word	0
 	.word	1093567616
 	.cfi_endproc
 .LFE13:
-	.size	tof_3d_localize, .-tof_3d_localize
+	.size	tof_2d_localize, .-tof_2d_localize
 	.section	.text.calculate_anchor_geometry,"ax",%progbits
 	.align	1
 	.global	calculate_anchor_geometry
@@ -2105,17 +1111,17 @@ tof_3d_localize:
 	.type	calculate_anchor_geometry, %function
 calculate_anchor_geometry:
 .LFB14:
-	.loc 1 168 1
+	.loc 1 144 1
 	.cfi_startproc
-	@ args = 0, pretend = 0, frame = 80
+	@ args = 0, pretend = 0, frame = 72
 	@ frame_needed = 0, uses_anonymous_args = 0
 	push	{r4, r5, lr}
 	.cfi_def_cfa_offset 12
 	.cfi_offset 4, -12
 	.cfi_offset 5, -8
 	.cfi_offset 14, -4
-	sub	sp, sp, #84
-	.cfi_def_cfa_offset 96
+	sub	sp, sp, #76
+	.cfi_def_cfa_offset 88
 	vstr.64	d0, [sp, #56]
 	vstr.64	d1, [sp, #48]
 	vstr.64	d2, [sp, #40]
@@ -2125,75 +1131,70 @@ calculate_anchor_geometry:
 	str	r0, [sp, #12]
 	str	r1, [sp, #8]
 	str	r2, [sp, #4]
-	.loc 1 169 8
+	.loc 1 145 8
 	mov	r2, #0
 	mov	r3, #0
 	ldrd	r0, [sp, #56]
 	bl	__aeabi_dcmple
 	mov	r3, r0
 	cmp	r3, #0
-	bne	.L73
-	.loc 1 169 18 discriminator 2
+	bne	.L65
+	.loc 1 145 18 discriminator 2
 	mov	r2, #0
 	mov	r3, #0
 	ldrd	r0, [sp, #48]
 	bl	__aeabi_dcmple
 	mov	r3, r0
 	cmp	r3, #0
-	bne	.L73
-	.loc 1 169 30 discriminator 4
+	bne	.L65
+	.loc 1 145 30 discriminator 4
 	mov	r2, #0
 	mov	r3, #0
 	ldrd	r0, [sp, #40]
 	bl	__aeabi_dcmple
 	mov	r3, r0
 	cmp	r3, #0
-	bne	.L73
-	.loc 1 169 42 discriminator 6
+	bne	.L65
+	.loc 1 145 42 discriminator 6
 	mov	r2, #0
 	mov	r3, #0
 	ldrd	r0, [sp, #32]
 	bl	__aeabi_dcmple
 	mov	r3, r0
 	cmp	r3, #0
-	bne	.L73
-	.loc 1 169 54 discriminator 8
+	bne	.L65
+	.loc 1 145 54 discriminator 8
 	mov	r2, #0
 	mov	r3, #0
 	ldrd	r0, [sp, #24]
 	bl	__aeabi_dcmple
 	mov	r3, r0
 	cmp	r3, #0
-	bne	.L73
-	.loc 1 169 66 discriminator 10
+	bne	.L65
+	.loc 1 145 66 discriminator 10
 	mov	r2, #0
 	mov	r3, #0
 	ldrd	r0, [sp, #16]
 	bl	__aeabi_dcmple
 	mov	r3, r0
 	cmp	r3, #0
-	beq	.L86
-.L73:
-	.loc 1 169 86 discriminator 11
+	beq	.L75
+.L65:
+	.loc 1 145 86 discriminator 11
 	movs	r3, #0
-	.loc 1 169 86 is_stmt 0
-	b	.L76
-.L86:
-	.loc 1 172 11 is_stmt 1
+	.loc 1 145 86 is_stmt 0
+	b	.L68
+.L75:
+	.loc 1 148 11 is_stmt 1
 	ldr	r1, [sp, #12]
 	ldrd	r2, [sp, #56]
 	strd	r2, [r1]
-	.loc 1 173 11
+	.loc 1 149 11
 	ldr	r1, [sp, #12]
 	mov	r2, #0
 	mov	r3, #0
 	strd	r2, [r1, #8]
-	.loc 1 174 11
-	ldr	r1, [sp, #12]
-	mov	r2, #0
-	mov	r3, #0
-	strd	r2, [r1, #16]
-	.loc 1 178 18
+	.loc 1 153 18
 	ldrd	r2, [sp, #48]
 	ldrd	r0, [sp, #48]
 	bl	__aeabi_dmul
@@ -2201,13 +1202,13 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 178 30
+	.loc 1 153 30
 	ldrd	r2, [sp, #56]
 	ldrd	r0, [sp, #56]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 178 24
+	.loc 1 153 24
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
@@ -2215,13 +1216,13 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 178 42
+	.loc 1 153 42
 	ldrd	r2, [sp, #32]
 	ldrd	r0, [sp, #32]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 178 36
+	.loc 1 153 36
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dsub
@@ -2229,23 +1230,23 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 178 56
+	.loc 1 153 56
 	ldrd	r0, [sp, #56]
 	mov	r2, r0
 	mov	r3, r1
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 178 49
+	.loc 1 153 49
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_ddiv
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 178 11
+	.loc 1 153 11
 	ldr	r1, [sp, #8]
 	strd	r2, [r1]
-	.loc 1 180 24
+	.loc 1 155 24
 	ldrd	r2, [sp, #48]
 	ldrd	r0, [sp, #48]
 	bl	__aeabi_dmul
@@ -2253,50 +1254,45 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 180 35
+	.loc 1 155 35
 	ldr	r3, [sp, #8]
 	ldrd	r0, [r3]
-	.loc 1 180 43
+	.loc 1 155 43
 	ldr	r3, [sp, #8]
 	ldrd	r2, [r3]
-	.loc 1 180 39
+	.loc 1 155 39
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 180 12
+	.loc 1 155 12
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dsub
 	mov	r2, r0
 	mov	r3, r1
-	strd	r2, [sp, #72]
-	.loc 1 181 8
+	strd	r2, [sp, #64]
+	.loc 1 156 8
 	mov	r2, #0
 	mov	r3, #0
-	ldrd	r0, [sp, #72]
+	ldrd	r0, [sp, #64]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
-	beq	.L77
-	.loc 1 181 26 discriminator 1
+	beq	.L69
+	.loc 1 156 26 discriminator 1
 	mov	r2, #0
 	mov	r3, #0
-	strd	r2, [sp, #72]
-.L77:
-	.loc 1 182 13
-	vldr.64	d0, [sp, #72]
+	strd	r2, [sp, #64]
+.L69:
+	.loc 1 157 13
+	vldr.64	d0, [sp, #64]
 	bl	sqrt
 	vmov.f32	s14, s0
 	vmov.f32	s15, s1
-	.loc 1 182 11 discriminator 1
+	.loc 1 157 11 discriminator 1
 	ldr	r3, [sp, #8]
 	vstr.64	d7, [r3, #8]
-	.loc 1 183 11
-	ldr	r1, [sp, #8]
-	mov	r2, #0
-	mov	r3, #0
-	strd	r2, [r1, #16]
-	.loc 1 186 18
+	.loc 1 160 18
 	ldrd	r2, [sp, #40]
 	ldrd	r0, [sp, #40]
 	bl	__aeabi_dmul
@@ -2304,13 +1300,13 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 186 30
+	.loc 1 160 30
 	ldrd	r2, [sp, #56]
 	ldrd	r0, [sp, #56]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 186 24
+	.loc 1 160 24
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
@@ -2318,13 +1314,13 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 186 42
+	.loc 1 160 42
 	ldrd	r2, [sp, #24]
 	ldrd	r0, [sp, #24]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 186 36
+	.loc 1 160 36
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dsub
@@ -2332,38 +1328,38 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 186 56
+	.loc 1 160 56
 	ldrd	r0, [sp, #56]
 	mov	r2, r0
 	mov	r3, r1
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 186 49
+	.loc 1 160 49
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_ddiv
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 186 11
+	.loc 1 160 11
 	ldr	r1, [sp, #4]
 	strd	r2, [r1]
-	.loc 1 188 11
+	.loc 1 162 11
 	ldr	r3, [sp, #8]
 	ldrd	r0, [r3, #8]
-	.loc 1 188 8
-	adr	r3, .L88
+	.loc 1 162 8
+	adr	r3, .L77
 	ldrd	r2, [r3]
 	bl	__aeabi_dcmplt
 	mov	r3, r0
 	cmp	r3, #0
-	beq	.L87
-	.loc 1 188 30 discriminator 1
+	beq	.L76
+	.loc 1 162 30 discriminator 1
 	movs	r3, #0
-	.loc 1 188 30 is_stmt 0
-	b	.L76
-.L87:
-	.loc 1 190 18 is_stmt 1
+	.loc 1 162 30 is_stmt 0
+	b	.L68
+.L76:
+	.loc 1 164 18 is_stmt 1
 	ldrd	r2, [sp, #48]
 	ldrd	r0, [sp, #48]
 	bl	__aeabi_dmul
@@ -2371,13 +1367,13 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 190 30
+	.loc 1 164 30
 	ldrd	r2, [sp, #40]
 	ldrd	r0, [sp, #40]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 190 24
+	.loc 1 164 24
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dadd
@@ -2385,13 +1381,13 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 190 42
+	.loc 1 164 42
 	ldrd	r2, [sp, #16]
 	ldrd	r0, [sp, #16]
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 190 36
+	.loc 1 164 36
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dsub
@@ -2399,10 +1395,10 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 190 58
+	.loc 1 164 58
 	ldr	r3, [sp, #4]
 	ldrd	r0, [r3]
-	.loc 1 190 54
+	.loc 1 164 54
 	mov	r2, r0
 	mov	r3, r1
 	bl	__aeabi_dadd
@@ -2410,14 +1406,14 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r0, r2
 	mov	r1, r3
-	.loc 1 190 66
+	.loc 1 164 66
 	ldr	r3, [sp, #8]
 	ldrd	r2, [r3]
-	.loc 1 190 62
+	.loc 1 164 62
 	bl	__aeabi_dmul
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 190 48
+	.loc 1 164 48
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_dsub
@@ -2425,100 +1421,36 @@ calculate_anchor_geometry:
 	mov	r3, r1
 	mov	r4, r2
 	mov	r5, r3
-	.loc 1 190 82
+	.loc 1 164 82
 	ldr	r3, [sp, #8]
 	ldrd	r0, [r3, #8]
-	.loc 1 190 78
+	.loc 1 164 78
 	mov	r2, r0
 	mov	r3, r1
 	bl	__aeabi_dadd
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 190 71
+	.loc 1 164 71
 	mov	r0, r4
 	mov	r1, r5
 	bl	__aeabi_ddiv
 	mov	r2, r0
 	mov	r3, r1
-	.loc 1 190 11
+	.loc 1 164 11
 	ldr	r1, [sp, #4]
 	strd	r2, [r1, #8]
-	.loc 1 192 24
-	ldrd	r2, [sp, #40]
-	ldrd	r0, [sp, #40]
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 192 35
-	ldr	r3, [sp, #4]
-	ldrd	r0, [r3]
-	.loc 1 192 43
-	ldr	r3, [sp, #4]
-	ldrd	r2, [r3]
-	.loc 1 192 39
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 192 30
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	mov	r4, r2
-	mov	r5, r3
-	.loc 1 192 53
-	ldr	r3, [sp, #4]
-	ldrd	r0, [r3, #8]
-	.loc 1 192 61
-	ldr	r3, [sp, #4]
-	ldrd	r2, [r3, #8]
-	.loc 1 192 57
-	bl	__aeabi_dmul
-	mov	r2, r0
-	mov	r3, r1
-	.loc 1 192 12
-	mov	r0, r4
-	mov	r1, r5
-	bl	__aeabi_dsub
-	mov	r2, r0
-	mov	r3, r1
-	strd	r2, [sp, #64]
-	.loc 1 193 8
-	mov	r2, #0
-	mov	r3, #0
-	ldrd	r0, [sp, #64]
-	bl	__aeabi_dcmplt
-	mov	r3, r0
-	cmp	r3, #0
-	beq	.L81
-	.loc 1 193 26 discriminator 1
-	mov	r2, #0
-	mov	r3, #0
-	strd	r2, [sp, #64]
-.L81:
-	.loc 1 194 13
-	vldr.64	d0, [sp, #64]
-	bl	sqrt
-	vmov.f32	s14, s0
-	vmov.f32	s15, s1
-	.loc 1 194 11 discriminator 1
-	ldr	r3, [sp, #4]
-	vstr.64	d7, [r3, #16]
-	.loc 1 196 12
+	.loc 1 166 12
 	movs	r3, #1
-.L76:
-	.loc 1 197 1
+.L68:
+	.loc 1 167 1
 	mov	r0, r3
-	add	sp, sp, #84
+	add	sp, sp, #76
 	.cfi_def_cfa_offset 12
 	@ sp needed
 	pop	{r4, r5, pc}
-.L89:
+.L78:
 	.align	3
-.L88:
+.L77:
 	.word	-1598689907
 	.word	1051772663
 	.cfi_endproc
@@ -2530,15 +1462,15 @@ calculate_anchor_geometry:
 	.file 3 "C:/Program Files/SEGGER/SEGGER Embedded Studio 8.24/include/math.h"
 	.section	.debug_info,"",%progbits
 .Ldebug_info0:
-	.4byte	0x4ae
+	.4byte	0x435
 	.2byte	0x4
 	.4byte	.Ldebug_abbrev0
 	.byte	0x4
 	.uleb128 0x1
-	.4byte	.LASF35
+	.4byte	.LASF31
 	.byte	0xc
-	.4byte	.LASF36
-	.4byte	.LASF37
+	.4byte	.LASF32
+	.4byte	.LASF33
 	.4byte	.Ldebug_ranges0+0x18
 	.4byte	0
 	.4byte	.Ldebug_line0
@@ -2587,11 +1519,11 @@ calculate_anchor_geometry:
 	.byte	0x3
 	.4byte	.LASF8
 	.uleb128 0x5
-	.byte	0x18
+	.byte	0x10
 	.byte	0x2
 	.byte	0xe
 	.byte	0x9
-	.4byte	0xa0
+	.4byte	0x95
 	.uleb128 0x6
 	.ascii	"x\000"
 	.byte	0x2
@@ -2606,22 +1538,15 @@ calculate_anchor_geometry:
 	.byte	0xc
 	.4byte	0x54
 	.byte	0x8
-	.uleb128 0x6
-	.ascii	"z\000"
-	.byte	0x2
-	.byte	0x11
-	.byte	0xc
-	.4byte	0x54
-	.byte	0x10
 	.byte	0
 	.uleb128 0x7
-	.4byte	.LASF38
+	.4byte	.LASF34
 	.byte	0x2
-	.byte	0x12
+	.byte	0x11
 	.byte	0x3
 	.4byte	0x75
 	.uleb128 0x3
-	.4byte	0xa0
+	.4byte	0x95
 	.uleb128 0x4
 	.byte	0x8
 	.byte	0x5
@@ -2632,7 +1557,7 @@ calculate_anchor_geometry:
 	.2byte	0x101
 	.byte	0xd
 	.4byte	0x54
-	.4byte	0xcf
+	.4byte	0xc4
 	.uleb128 0x9
 	.4byte	0x54
 	.byte	0
@@ -2642,7 +1567,7 @@ calculate_anchor_geometry:
 	.byte	0x63
 	.byte	0xd
 	.4byte	0x25
-	.4byte	0xe5
+	.4byte	0xda
 	.uleb128 0x9
 	.4byte	0x54
 	.byte	0
@@ -2652,126 +1577,117 @@ calculate_anchor_geometry:
 	.byte	0x65
 	.byte	0xd
 	.4byte	0x25
-	.4byte	0xfb
+	.4byte	0xf0
 	.uleb128 0x9
 	.4byte	0x54
 	.byte	0
 	.uleb128 0xb
-	.4byte	.LASF15
+	.4byte	.LASF13
 	.byte	0x1
-	.byte	0xa5
+	.byte	0x8d
 	.byte	0x5
 	.4byte	0x25
 	.4byte	.LFB14
 	.4byte	.LFE14-.LFB14
 	.uleb128 0x1
 	.byte	0x9c
-	.4byte	0x1bd
+	.4byte	0x1a2
 	.uleb128 0xc
 	.ascii	"d01\000"
 	.byte	0x1
-	.byte	0xa5
+	.byte	0x8d
 	.byte	0x26
+	.4byte	0x54
+	.uleb128 0x2
+	.byte	0x91
+	.sleb128 -32
+	.uleb128 0xc
+	.ascii	"d02\000"
+	.byte	0x1
+	.byte	0x8d
+	.byte	0x32
 	.4byte	0x54
 	.uleb128 0x2
 	.byte	0x91
 	.sleb128 -40
 	.uleb128 0xc
-	.ascii	"d02\000"
+	.ascii	"d03\000"
 	.byte	0x1
-	.byte	0xa5
-	.byte	0x32
+	.byte	0x8d
+	.byte	0x3e
 	.4byte	0x54
 	.uleb128 0x2
 	.byte	0x91
 	.sleb128 -48
 	.uleb128 0xc
-	.ascii	"d03\000"
+	.ascii	"d12\000"
 	.byte	0x1
-	.byte	0xa5
-	.byte	0x3e
+	.byte	0x8e
+	.byte	0x26
 	.4byte	0x54
 	.uleb128 0x2
 	.byte	0x91
 	.sleb128 -56
 	.uleb128 0xc
-	.ascii	"d12\000"
+	.ascii	"d13\000"
 	.byte	0x1
-	.byte	0xa6
-	.byte	0x26
+	.byte	0x8e
+	.byte	0x32
 	.4byte	0x54
 	.uleb128 0x2
 	.byte	0x91
 	.sleb128 -64
 	.uleb128 0xc
-	.ascii	"d13\000"
+	.ascii	"d23\000"
 	.byte	0x1
-	.byte	0xa6
-	.byte	0x32
+	.byte	0x8e
+	.byte	0x3e
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
 	.sleb128 -72
 	.uleb128 0xc
-	.ascii	"d23\000"
+	.ascii	"a1\000"
 	.byte	0x1
-	.byte	0xa6
-	.byte	0x3e
-	.4byte	0x54
+	.byte	0x8f
+	.byte	0x25
+	.4byte	0x1a2
+	.uleb128 0x3
+	.byte	0x91
+	.sleb128 -76
+	.uleb128 0xc
+	.ascii	"a2\000"
+	.byte	0x1
+	.byte	0x8f
+	.byte	0x2f
+	.4byte	0x1a2
 	.uleb128 0x3
 	.byte	0x91
 	.sleb128 -80
 	.uleb128 0xc
-	.ascii	"a1\000"
+	.ascii	"a3\000"
 	.byte	0x1
-	.byte	0xa7
-	.byte	0x25
-	.4byte	0x1bd
+	.byte	0x8f
+	.byte	0x39
+	.4byte	0x1a2
 	.uleb128 0x3
 	.byte	0x91
 	.sleb128 -84
-	.uleb128 0xc
-	.ascii	"a2\000"
-	.byte	0x1
-	.byte	0xa7
-	.byte	0x2f
-	.4byte	0x1bd
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -88
-	.uleb128 0xc
-	.ascii	"a3\000"
-	.byte	0x1
-	.byte	0xa7
-	.byte	0x39
-	.4byte	0x1bd
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -92
 	.uleb128 0xd
-	.4byte	.LASF13
+	.4byte	.LASF18
 	.byte	0x1
-	.byte	0xb4
+	.byte	0x9b
 	.byte	0xc
 	.4byte	0x54
 	.uleb128 0x2
 	.byte	0x91
 	.sleb128 -24
-	.uleb128 0xd
-	.4byte	.LASF14
-	.byte	0x1
-	.byte	0xc0
-	.byte	0xc
-	.4byte	0x54
-	.uleb128 0x2
-	.byte	0x91
-	.sleb128 -32
 	.byte	0
 	.uleb128 0xe
 	.byte	0x4
-	.4byte	0xa0
+	.4byte	0x95
 	.uleb128 0xb
-	.4byte	.LASF16
+	.4byte	.LASF14
 	.byte	0x1
 	.byte	0xa
 	.byte	0x5
@@ -2780,321 +1696,276 @@ calculate_anchor_geometry:
 	.4byte	.LFE13-.LFB13
 	.uleb128 0x1
 	.byte	0x9c
-	.4byte	0x483
+	.4byte	0x40a
 	.uleb128 0xc
 	.ascii	"anc\000"
 	.byte	0x1
 	.byte	0xa
 	.byte	0x20
-	.4byte	0x483
+	.4byte	0x40a
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -452
+	.sleb128 -316
 	.uleb128 0xf
-	.4byte	.LASF17
+	.4byte	.LASF15
 	.byte	0x1
 	.byte	0xa
 	.byte	0x2b
 	.4byte	0x25
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -456
+	.sleb128 -320
 	.uleb128 0xf
-	.4byte	.LASF18
+	.4byte	.LASF16
 	.byte	0x1
 	.byte	0xb
 	.byte	0x22
-	.4byte	0x489
+	.4byte	0x410
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -460
+	.sleb128 -324
 	.uleb128 0xf
-	.4byte	.LASF19
+	.4byte	.LASF17
 	.byte	0x1
 	.byte	0xc
 	.byte	0x1b
-	.4byte	0x1bd
+	.4byte	0x1a2
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -464
+	.sleb128 -328
 	.uleb128 0xd
-	.4byte	.LASF20
+	.4byte	.LASF19
 	.byte	0x1
-	.byte	0x1c
+	.byte	0x1b
 	.byte	0xc
 	.4byte	0x54
 	.uleb128 0x2
 	.byte	0x91
 	.sleb128 -48
 	.uleb128 0xd
-	.4byte	.LASF21
+	.4byte	.LASF20
 	.byte	0x1
-	.byte	0x1c
+	.byte	0x1b
 	.byte	0x14
 	.4byte	0x54
 	.uleb128 0x2
 	.byte	0x91
 	.sleb128 -56
 	.uleb128 0xd
-	.4byte	.LASF22
+	.4byte	.LASF21
 	.byte	0x1
-	.byte	0x1c
-	.byte	0x1c
-	.4byte	0x54
-	.uleb128 0x2
-	.byte	0x91
-	.sleb128 -64
-	.uleb128 0xd
-	.4byte	.LASF23
-	.byte	0x1
-	.byte	0x1f
+	.byte	0x1e
 	.byte	0x9
 	.4byte	0x25
-	.uleb128 0x3
+	.uleb128 0x2
 	.byte	0x91
-	.sleb128 -68
+	.sleb128 -60
 	.uleb128 0xd
-	.4byte	.LASF24
+	.4byte	.LASF22
 	.byte	0x1
-	.byte	0x28
+	.byte	0x26
 	.byte	0xc
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -80
+	.sleb128 -72
 	.uleb128 0xd
-	.4byte	.LASF25
+	.4byte	.LASF23
 	.byte	0x1
-	.byte	0x29
+	.byte	0x27
 	.byte	0xf
 	.4byte	0x2c
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -152
+	.sleb128 -136
 	.uleb128 0x10
 	.4byte	.LBB2
 	.4byte	.LBE2-.LBB2
-	.4byte	0x296
+	.4byte	0x26a
 	.uleb128 0x11
 	.ascii	"i\000"
 	.byte	0x1
-	.byte	0x20
+	.byte	0x1f
 	.byte	0xe
 	.4byte	0x25
-	.uleb128 0x3
+	.uleb128 0x2
 	.byte	0x91
-	.sleb128 -72
+	.sleb128 -64
 	.byte	0
 	.uleb128 0x12
 	.4byte	.LBB3
 	.4byte	.LBE3-.LBB3
 	.uleb128 0xd
-	.4byte	.LASF26
+	.4byte	.LASF24
 	.byte	0x1
-	.byte	0x2b
+	.byte	0x29
 	.byte	0xe
 	.4byte	0x25
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -84
+	.sleb128 -76
 	.uleb128 0x13
 	.4byte	.Ldebug_ranges0+0
 	.uleb128 0x11
 	.ascii	"jtj\000"
 	.byte	0x1
-	.byte	0x2d
+	.byte	0x2b
 	.byte	0x10
-	.4byte	0x48f
+	.4byte	0x416
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -448
+	.sleb128 -312
 	.uleb128 0x11
 	.ascii	"jtf\000"
 	.byte	0x1
-	.byte	0x2e
+	.byte	0x2c
 	.byte	0x10
-	.4byte	0x4a5
+	.4byte	0x42c
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -304
+	.sleb128 -248
 	.uleb128 0xd
-	.4byte	.LASF27
+	.4byte	.LASF25
 	.byte	0x1
-	.byte	0x2f
+	.byte	0x2d
 	.byte	0x10
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -96
+	.sleb128 -88
 	.uleb128 0x11
 	.ascii	"det\000"
 	.byte	0x1
-	.byte	0x51
+	.byte	0x4a
 	.byte	0x10
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -160
+	.sleb128 -144
 	.uleb128 0x11
 	.ascii	"inv\000"
 	.byte	0x1
-	.byte	0x5b
+	.byte	0x52
 	.byte	0x10
-	.4byte	0x48f
+	.4byte	0x416
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -376
+	.sleb128 -280
 	.uleb128 0xd
-	.4byte	.LASF28
+	.4byte	.LASF26
 	.byte	0x1
-	.byte	0x68
+	.byte	0x58
+	.byte	0x10
+	.4byte	0x54
+	.uleb128 0x3
+	.byte	0x91
+	.sleb128 -112
+	.uleb128 0xd
+	.4byte	.LASF27
+	.byte	0x1
+	.byte	0x59
 	.byte	0x10
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
 	.sleb128 -120
 	.uleb128 0xd
+	.4byte	.LASF28
+	.byte	0x1
+	.byte	0x61
+	.byte	0x10
+	.4byte	0x54
+	.uleb128 0x3
+	.byte	0x91
+	.sleb128 -152
+	.uleb128 0xd
 	.4byte	.LASF29
 	.byte	0x1
-	.byte	0x69
+	.byte	0x62
+	.byte	0x10
+	.4byte	0x54
+	.uleb128 0x3
+	.byte	0x91
+	.sleb128 -160
+	.uleb128 0xd
+	.4byte	.LASF30
+	.byte	0x1
+	.byte	0x6d
 	.byte	0x10
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
 	.sleb128 -128
-	.uleb128 0xd
-	.4byte	.LASF30
-	.byte	0x1
-	.byte	0x6a
-	.byte	0x10
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -136
-	.uleb128 0xd
-	.4byte	.LASF31
-	.byte	0x1
-	.byte	0x74
-	.byte	0x10
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -168
-	.uleb128 0xd
-	.4byte	.LASF32
-	.byte	0x1
-	.byte	0x75
-	.byte	0x10
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -176
-	.uleb128 0xd
-	.4byte	.LASF33
-	.byte	0x1
-	.byte	0x76
-	.byte	0x10
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -184
-	.uleb128 0xd
-	.4byte	.LASF34
-	.byte	0x1
-	.byte	0x81
-	.byte	0x10
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -144
 	.uleb128 0x10
 	.4byte	.LBB5
 	.4byte	.LBE5-.LBB5
-	.4byte	0x412
+	.4byte	0x3a8
 	.uleb128 0x11
 	.ascii	"i\000"
 	.byte	0x1
-	.byte	0x32
+	.byte	0x30
 	.byte	0x12
 	.4byte	0x25
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -100
+	.sleb128 -92
 	.uleb128 0x12
 	.4byte	.LBB6
 	.4byte	.LBE6-.LBB6
 	.uleb128 0x11
 	.ascii	"dx\000"
 	.byte	0x1
-	.byte	0x34
+	.byte	0x32
 	.byte	0x14
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -232
+	.sleb128 -200
 	.uleb128 0x11
 	.ascii	"dy\000"
+	.byte	0x1
+	.byte	0x33
+	.byte	0x14
+	.4byte	0x54
+	.uleb128 0x3
+	.byte	0x91
+	.sleb128 -208
+	.uleb128 0x11
+	.ascii	"r\000"
 	.byte	0x1
 	.byte	0x35
 	.byte	0x14
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -240
+	.sleb128 -104
 	.uleb128 0x11
-	.ascii	"dz\000"
-	.byte	0x1
-	.byte	0x36
-	.byte	0x14
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -248
-	.uleb128 0x11
-	.ascii	"r\000"
+	.ascii	"res\000"
 	.byte	0x1
 	.byte	0x38
 	.byte	0x14
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -112
+	.sleb128 -216
 	.uleb128 0x11
-	.ascii	"res\000"
+	.ascii	"jx\000"
 	.byte	0x1
 	.byte	0x3b
 	.byte	0x14
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -256
-	.uleb128 0x11
-	.ascii	"jx\000"
-	.byte	0x1
-	.byte	0x3e
-	.byte	0x14
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -264
+	.sleb128 -224
 	.uleb128 0x11
 	.ascii	"jy\000"
 	.byte	0x1
-	.byte	0x3f
+	.byte	0x3c
 	.byte	0x14
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -272
-	.uleb128 0x11
-	.ascii	"jz\000"
-	.byte	0x1
-	.byte	0x40
-	.byte	0x14
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -280
+	.sleb128 -232
 	.byte	0
 	.byte	0
 	.uleb128 0x12
@@ -3103,60 +1974,51 @@ calculate_anchor_geometry:
 	.uleb128 0x11
 	.ascii	"i\000"
 	.byte	0x1
-	.byte	0x82
+	.byte	0x6e
 	.byte	0x12
 	.4byte	0x25
 	.uleb128 0x3
 	.byte	0x91
-	.sleb128 -148
+	.sleb128 -132
 	.uleb128 0x12
 	.4byte	.LBB8
 	.4byte	.LBE8-.LBB8
 	.uleb128 0x11
 	.ascii	"tx\000"
 	.byte	0x1
-	.byte	0x83
+	.byte	0x6f
+	.byte	0x14
+	.4byte	0x54
+	.uleb128 0x3
+	.byte	0x91
+	.sleb128 -168
+	.uleb128 0x11
+	.ascii	"ty\000"
+	.byte	0x1
+	.byte	0x70
+	.byte	0x14
+	.4byte	0x54
+	.uleb128 0x3
+	.byte	0x91
+	.sleb128 -176
+	.uleb128 0x11
+	.ascii	"tr\000"
+	.byte	0x1
+	.byte	0x71
+	.byte	0x14
+	.4byte	0x54
+	.uleb128 0x3
+	.byte	0x91
+	.sleb128 -184
+	.uleb128 0x11
+	.ascii	"res\000"
+	.byte	0x1
+	.byte	0x72
 	.byte	0x14
 	.4byte	0x54
 	.uleb128 0x3
 	.byte	0x91
 	.sleb128 -192
-	.uleb128 0x11
-	.ascii	"ty\000"
-	.byte	0x1
-	.byte	0x84
-	.byte	0x14
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -200
-	.uleb128 0x11
-	.ascii	"tz\000"
-	.byte	0x1
-	.byte	0x85
-	.byte	0x14
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -208
-	.uleb128 0x11
-	.ascii	"tr\000"
-	.byte	0x1
-	.byte	0x86
-	.byte	0x14
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -216
-	.uleb128 0x11
-	.ascii	"res\000"
-	.byte	0x1
-	.byte	0x87
-	.byte	0x14
-	.4byte	0x54
-	.uleb128 0x3
-	.byte	0x91
-	.sleb128 -224
 	.byte	0
 	.byte	0
 	.byte	0
@@ -3164,25 +2026,25 @@ calculate_anchor_geometry:
 	.byte	0
 	.uleb128 0xe
 	.byte	0x4
-	.4byte	0xac
+	.4byte	0xa1
 	.uleb128 0xe
 	.byte	0x4
 	.4byte	0x5b
 	.uleb128 0x14
 	.4byte	0x54
-	.4byte	0x4a5
+	.4byte	0x42c
 	.uleb128 0x15
 	.4byte	0x38
-	.byte	0x2
+	.byte	0x1
 	.uleb128 0x15
 	.4byte	0x38
-	.byte	0x2
+	.byte	0x1
 	.byte	0
 	.uleb128 0x16
 	.4byte	0x54
 	.uleb128 0x15
 	.4byte	0x38
-	.byte	0x2
+	.byte	0x1
 	.byte	0
 	.byte	0
 	.section	.debug_abbrev,"",%progbits
@@ -3500,23 +2362,23 @@ calculate_anchor_geometry:
 	.4byte	0x87
 	.2byte	0x2
 	.4byte	.Ldebug_info0
-	.4byte	0x4b2
-	.4byte	0xb8
+	.4byte	0x439
+	.4byte	0xad
 	.ascii	"sqrt\000"
-	.4byte	0xcf
+	.4byte	0xc4
 	.ascii	"__SEGGER_RTL_float64_isinf\000"
-	.4byte	0xe5
+	.4byte	0xda
 	.ascii	"__SEGGER_RTL_float64_isnan\000"
-	.4byte	0xfb
+	.4byte	0xf0
 	.ascii	"calculate_anchor_geometry\000"
-	.4byte	0x1c3
-	.ascii	"tof_3d_localize\000"
+	.4byte	0x1a8
+	.ascii	"tof_2d_localize\000"
 	.4byte	0
 	.section	.debug_pubtypes,"",%progbits
 	.4byte	0xba
 	.2byte	0x2
 	.4byte	.Ldebug_info0
-	.4byte	0x4b2
+	.4byte	0x439
 	.4byte	0x25
 	.ascii	"int\000"
 	.4byte	0x31
@@ -3537,9 +2399,9 @@ calculate_anchor_geometry:
 	.ascii	"long double\000"
 	.4byte	0x6e
 	.ascii	"complex long double\000"
-	.4byte	0xa0
-	.ascii	"vec3\000"
-	.4byte	0xb1
+	.4byte	0x95
+	.ascii	"vec2\000"
+	.4byte	0xa6
 	.ascii	"long long int\000"
 	.4byte	0
 	.section	.debug_aranges,"",%progbits
@@ -3573,36 +2435,65 @@ calculate_anchor_geometry:
 	.section	.debug_line,"",%progbits
 .Ldebug_line0:
 	.section	.debug_str,"MS",%progbits,1
-.LASF29:
-	.ascii	"dy_step\000"
-.LASF4:
-	.ascii	"complex float\000"
-.LASF24:
+.LASF34:
+	.ascii	"vec2\000"
+.LASF22:
 	.ascii	"lambda\000"
-.LASF13:
-	.ascii	"y2_sq\000"
-.LASF25:
-	.ascii	"max_it\000"
-.LASF36:
-	.ascii	"D:\\TN\\Hybrid_Positioning\\Hybrid_Positioning\\ss_"
-	.ascii	"twr_init\\utils.c\000"
-.LASF16:
-	.ascii	"tof_3d_localize\000"
+.LASF11:
+	.ascii	"__SEGGER_RTL_float64_isinf\000"
+.LASF24:
+	.ascii	"iter\000"
+.LASF17:
+	.ascii	"pos_est\000"
+.LASF27:
+	.ascii	"dy_step\000"
+.LASF28:
+	.ascii	"next_x\000"
+.LASF29:
+	.ascii	"next_y\000"
 .LASF3:
 	.ascii	"float\000"
+.LASF18:
+	.ascii	"y2_sq\000"
+.LASF26:
+	.ascii	"dx_step\000"
+.LASF5:
+	.ascii	"double\000"
+.LASF15:
+	.ascii	"num_anchors\000"
+.LASF32:
+	.ascii	"D:\\TN\\Hybrid_Positioning\\Hybrid_Positioning\\ss_"
+	.ascii	"twr_init\\utils.c\000"
+.LASF12:
+	.ascii	"__SEGGER_RTL_float64_isnan\000"
+.LASF8:
+	.ascii	"complex long double\000"
+.LASF13:
+	.ascii	"calculate_anchor_geometry\000"
+.LASF1:
+	.ascii	"unsigned int\000"
+.LASF14:
+	.ascii	"tof_2d_localize\000"
+.LASF0:
+	.ascii	"char\000"
+.LASF4:
+	.ascii	"complex float\000"
 .LASF9:
 	.ascii	"long long int\000"
 .LASF20:
-	.ascii	"curr_x\000"
-.LASF21:
 	.ascii	"curr_y\000"
+.LASF30:
+	.ascii	"next_cost\000"
+.LASF6:
+	.ascii	"complex double\000"
+.LASF21:
+	.ascii	"min_i\000"
+.LASF33:
+	.ascii	"D:\\TN\\Hybrid_Positioning\\Hybrid_Positioning\\ss_"
+	.ascii	"twr_init\\SES\000"
 .LASF2:
 	.ascii	"long int\000"
-.LASF34:
-	.ascii	"next_cost\000"
-.LASF18:
-	.ascii	"distances\000"
-.LASF35:
+.LASF31:
 	.ascii	"GNU C99 14.2.1 20241119 -fmessage-length=0 -std=gnu"
 	.ascii	"99 -mcpu=cortex-m4 -mlittle-endian -mfloat-abi=hard"
 	.ascii	" -mabi=aapcs -mfpu=fpv4-sp-d16 -mthumb -munaligned-"
@@ -3611,53 +2502,16 @@ calculate_anchor_geometry:
 	.ascii	"-fdata-sections -fshort-enums -fno-common\000"
 .LASF7:
 	.ascii	"long double\000"
-.LASF12:
-	.ascii	"__SEGGER_RTL_float64_isnan\000"
-.LASF11:
-	.ascii	"__SEGGER_RTL_float64_isinf\000"
-.LASF31:
-	.ascii	"next_x\000"
-.LASF32:
-	.ascii	"next_y\000"
-.LASF33:
-	.ascii	"next_z\000"
-.LASF23:
-	.ascii	"min_i\000"
-.LASF30:
-	.ascii	"dz_step\000"
-.LASF1:
-	.ascii	"unsigned int\000"
-.LASF0:
-	.ascii	"char\000"
-.LASF17:
-	.ascii	"num_anchors\000"
-.LASF38:
-	.ascii	"vec3\000"
-.LASF37:
-	.ascii	"D:\\TN\\Hybrid_Positioning\\Hybrid_Positioning\\ss_"
-	.ascii	"twr_init\\SES\000"
-.LASF14:
-	.ascii	"z3_sq\000"
-.LASF27:
+.LASF25:
 	.ascii	"curr_cost\000"
-.LASF6:
-	.ascii	"complex double\000"
-.LASF5:
-	.ascii	"double\000"
-.LASF28:
-	.ascii	"dx_step\000"
+.LASF16:
+	.ascii	"distances\000"
+.LASF19:
+	.ascii	"curr_x\000"
 .LASF10:
 	.ascii	"sqrt\000"
-.LASF8:
-	.ascii	"complex long double\000"
-.LASF15:
-	.ascii	"calculate_anchor_geometry\000"
-.LASF26:
-	.ascii	"iter\000"
-.LASF22:
-	.ascii	"curr_z\000"
-.LASF19:
-	.ascii	"pos_est\000"
+.LASF23:
+	.ascii	"max_it\000"
 	.global	__aeabi_dcmple
 	.global	__aeabi_ddiv
 	.global	__aeabi_dadd

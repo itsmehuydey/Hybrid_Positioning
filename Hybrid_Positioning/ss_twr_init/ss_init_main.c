@@ -20,11 +20,10 @@ extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
 extern uint8_t g_current_role; 
 // Cập nhật tham số truyền vào của hàm Flash
-extern void flash_config_write(uint8_t role, uint8_t id, float x, float y, float z);
+extern void flash_config_write(uint8_t role, uint8_t id, float x, float y);
 
-static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f, 0.0f}; 
-static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f, 0.0f};
-static const float HARDCODED_ANCHOR_Z[MAX_ANCHORS] = {0.0f, 0.0f, 0.0f, 1.0f}; 
+static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f, 1.0f}; 
+static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f, 1.0f};
 
 #define CALIB_SAMPLES 10                  
 #define CALIB_TRUE_DISTANCE 1.0f          
@@ -38,10 +37,10 @@ static bool g_is_calibrating = false;
 static uint8_t tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
 static uint8_t rx_buffer[32]; 
 static uint16_t g_cycle_id = 0;
-static vec3 g_tag_pos_est = {0.0, 0.0, 0.0};
+static vec2 g_tag_pos_est = {0.0, 0.0};
 
 typedef struct {
-    float x; float y; float z; float dist;
+    float x; float y; float dist;
     uint32_t last_update_tick; bool is_valid;
 } anchor_data_t;
 
@@ -53,8 +52,8 @@ void reset_uwb_state(void) {
     dwt_write32bitreg(SYS_STATUS_ID, 0xFFFFFFFF);
 }
 
-bool calculate_tag_position(float *out_x, float *out_y, float *out_z) {
-    vec3 valid_anchors[MAX_ANCHORS];
+bool calculate_tag_position(float *out_x, float *out_y) {
+    vec2 valid_anchors[MAX_ANCHORS];
     double valid_distances[MAX_ANCHORS];
     int count = 0;
 
@@ -63,14 +62,13 @@ bool calculate_tag_position(float *out_x, float *out_y, float *out_z) {
         if (anchors_info[i].is_valid && (current_tick - anchors_info[i].last_update_tick < pdMS_TO_TICKS(2000))) {
             valid_anchors[count].x = (double)anchors_info[i].x;
             valid_anchors[count].y = (double)anchors_info[i].y;
-            valid_anchors[count].z = (double)anchors_info[i].z;
             valid_distances[count] = (double)anchors_info[i].dist;
             count++;
         }
     }
-    if (count < 4) return false; 
-    if (tof_3d_localize(valid_anchors, count, valid_distances, &g_tag_pos_est) > 0) {
-        *out_x = (float)g_tag_pos_est.x; *out_y = (float)g_tag_pos_est.y; *out_z = (float)g_tag_pos_est.z;
+    if (count < 3) return false; 
+    if (tof_2d_localize(valid_anchors, count, valid_distances, &g_tag_pos_est) > 0) {
+        *out_x = (float)g_tag_pos_est.x; *out_y = (float)g_tag_pos_est.y;
         return true;
     }
     return false;
@@ -152,8 +150,8 @@ void ss_initiator_task_function(void *pvParameter) {
 
             if (g_current_role == 99) {
                 printf("[TAG] CALIBRATION FINISHED. REVERTING FLASH TO ROLE 1 AND RESETTING...\r\n");
-                // Ghi đè Role về 1, tọa độ của Tag thì set mặc định 0,0,0
-                flash_config_write(1, g_current_node_id, 0.0f, 0.0f, 0.0f);
+                // Ghi đè Role về 1, tọa độ của Tag thì set mặc định 0,0
+                flash_config_write(1, g_current_node_id, 0.0f, 0.0f);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 NVIC_SystemReset();
             }
@@ -209,7 +207,6 @@ void ss_initiator_task_function(void *pvParameter) {
                             if (dist <= 0.0f) dist = 0.01f;
                             anchors_info[a].x = HARDCODED_ANCHOR_X[a];
                             anchors_info[a].y = HARDCODED_ANCHOR_Y[a];
-                            anchors_info[a].z = HARDCODED_ANCHOR_Z[a];
                             anchors_info[a].dist = dist;
                             anchors_info[a].last_update_tick = xTaskGetTickCount();
                             anchors_info[a].is_valid = true;
@@ -224,15 +221,15 @@ void ss_initiator_task_function(void *pvParameter) {
             }
         } 
 
-        float tag_x = 0.0f, tag_y = 0.0f, tag_z = 0.0f;
-        if (calculate_tag_position(&tag_x, &tag_y, &tag_z)) {
+        float tag_x = 0.0f, tag_y = 0.0f;
+        if (calculate_tag_position(&tag_x, &tag_y)) {
             float d0 = anchors_info[0].is_valid ? anchors_info[0].dist : 0.0f;
             float d1 = anchors_info[1].is_valid ? anchors_info[1].dist : 0.0f;
             float d2 = anchors_info[2].is_valid ? anchors_info[2].dist : 0.0f;
             float d3 = anchors_info[3].is_valid ? anchors_info[3].dist : 0.0f;
 
-            printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"measuring\",\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"d\":[%.2f,%.2f,%.2f,%.2f]}\r\n", 
-                   g_current_node_id, tag_x, tag_y, tag_z, d0, d1, d2, d3);
+            printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"measuring\",\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f,%.2f]}\r\n", 
+                   g_current_node_id, tag_x, tag_y, d0, d1, d2, d3);
 
             #pragma pack(push, 1)
             typedef struct {
@@ -241,7 +238,6 @@ void ss_initiator_task_function(void *pvParameter) {
                 uint8_t seq;
                 float x; 
                 float y; 
-                float z; 
             } ble_packed_data_t;
             #pragma pack(pop)
 
@@ -250,7 +246,6 @@ void ss_initiator_task_function(void *pvParameter) {
             pkt.id = g_current_node_id;
             pkt.x = tag_x; 
             pkt.y = tag_y; 
-            pkt.z = tag_z;
 
             for(int i = 0; i < 10; i++) {
                 pkt.seq = tag_seq++;
@@ -270,7 +265,7 @@ void ss_initiator_task_function(void *pvParameter) {
                     }
                     g_is_calibrating = true;
                 } else {
-                    flash_config_write(cfg.role, cfg.node_id, 0.0f, 0.0f, 0.0f);
+                    flash_config_write(cfg.role, cfg.node_id, 0.0f, 0.0f);
                     vTaskDelay(pdMS_TO_TICKS(100)); 
                     NVIC_SystemReset();
                 }

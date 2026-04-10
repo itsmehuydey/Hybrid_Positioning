@@ -38,12 +38,11 @@ uint16_t g_my_mac = 0;
 
 float g_my_pos_x = 0.0f;
 float g_my_pos_y = 0.0f;
-float g_my_pos_z = 0.0f;
 
 #define CONFIG_FLASH_ADDR 0x0007E000 // Sử dụng Page 126 ở cuối bộ nhớ Flash
 
-// Đã nâng cấp hàm ghi Flash để lưu cả 3 tọa độ float
-void flash_config_write(uint8_t role, uint8_t id, float x, float y, float z) {
+// Hàm ghi Flash để lưu 2 tọa độ float (2D)
+void flash_config_write(uint8_t role, uint8_t id, float x, float y) {
     NRF_NVMC->CONFIG = 2; // Bật chế độ XÓA (ERASE)
     NRF_NVMC->ERASEPAGE = CONFIG_FLASH_ADDR;
     while(NRF_NVMC->READY == 0);
@@ -52,16 +51,14 @@ void flash_config_write(uint8_t role, uint8_t id, float x, float y, float z) {
     uint32_t magic_word = 0xDEADBEEF;
     uint32_t config_data = (id << 8) | role;
     
-    uint32_t raw_x, raw_y, raw_z;
+    uint32_t raw_x, raw_y;
     memcpy(&raw_x, &x, 4);
     memcpy(&raw_y, &y, 4);
-    memcpy(&raw_z, &z, 4);
     
     ((uint32_t*)CONFIG_FLASH_ADDR)[0] = magic_word;
     ((uint32_t*)CONFIG_FLASH_ADDR)[1] = config_data;
     ((uint32_t*)CONFIG_FLASH_ADDR)[2] = raw_x;
     ((uint32_t*)CONFIG_FLASH_ADDR)[3] = raw_y;
-    ((uint32_t*)CONFIG_FLASH_ADDR)[4] = raw_z;
     while(NRF_NVMC->READY == 0);
     
     NRF_NVMC->CONFIG = 0; // Trả về chế độ ĐỌC (READ)
@@ -120,7 +117,6 @@ int main(void) {
         g_current_node_id = (uint8_t)((flash_ptr[1] >> 8) & 0xFF);
         memcpy(&g_my_pos_x, &flash_ptr[2], 4);
         memcpy(&g_my_pos_y, &flash_ptr[3], 4);
-        memcpy(&g_my_pos_z, &flash_ptr[4], 4);
     }
 
     printf("\r\n=== UWB Hybrid Localization System ===\r\n");
@@ -155,7 +151,7 @@ int main(void) {
                     uint8_t new_id = scan_buf[4];
                     printf("\r\n=> NHAN LENH DOI ROLE! Role moi: %d, ID: %d. Resetting...\r\n", new_role, new_id);
                     // Reset đổi role giữ nguyên tọa độ cũ
-                    flash_config_write(new_role, new_id, g_my_pos_x, g_my_pos_y, g_my_pos_z);
+                    flash_config_write(new_role, new_id, g_my_pos_x, g_my_pos_y);
                     nrf_delay_ms(500);
                     NVIC_SystemReset();
                 }

@@ -185,7 +185,7 @@ int ble_scan_packet(uint8_t *out, uint16_t *out_len)
     return 0;
 }
 
-int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y, float *out_z)
+int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y)
 {
     for (uint8_t ch = 0; ch < 3; ch++)
     {
@@ -230,15 +230,14 @@ int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y, float *out_
                         {
                             uint8_t payload_len = fl - 3;
 
-                            // magic(1) + id(1) + x(4) + y(4) + z(4) = 14 bytes
-                            if (payload_len >= 14) { 
+                            // magic(1) + id(1) + x(4) + y(4) = 10 bytes
+                            if (payload_len >= 10) { 
                                 uint8_t magic = p[4];
                                 uint8_t target_id = p[5];
 
                                 if (magic == 'G' && target_id == my_id) {
                                     memcpy(out_x, &p[6], 4);
                                     memcpy(out_y, &p[10], 4);
-                                    memcpy(out_z, &p[14], 4);
                                     NRF_RADIO->TASKS_DISABLE = 1;
                                     return 1; // Nhận thành công
                                 }

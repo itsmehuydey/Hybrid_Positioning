@@ -1,5 +1,5 @@
-#ifndef TOF_3D_SOLVER_H
-#define TOF_3D_SOLVER_H
+#ifndef TOF_2D_SOLVER_H
+#define TOF_2D_SOLVER_H
 
 #include <stdio.h>
 #include <math.h>
@@ -9,35 +9,33 @@ extern "C" {
 #endif
 
 /* ============================================================
-   Cấu trúc dữ liệu Vector 3D
+   Cấu trúc dữ liệu Vector 2D
    ============================================================ */
 typedef struct {
     double x;
     double y;
-    double z;
-} vec3;
+} vec2;
 
-/* Hàm hỗ trợ tính khoảng cách giữa 2 điểm 3D */
-static inline double vdist3(vec3 a, vec3 b) {
+/* Hàm hỗ trợ tính khoảng cách giữa 2 điểm 2D */
+static inline double vdist2(vec2 a, vec2 b) {
     double dx = a.x - b.x;
     double dy = a.y - b.y;
-    double dz = a.z - b.z;
-    return sqrt(dx*dx + dy*dy + dz*dz);
+    return sqrt(dx*dx + dy*dy);
 }
 
 /* ============================================================
-   Hàm giải tọa độ 3D bằng ToF (Time of Flight) Levenberg-Marquardt
+   Hàm giải tọa độ 2D bằng ToF (Time of Flight) Levenberg-Marquardt
    ============================================================ */
-int tof_3d_localize(const vec3 anc[], int num_anchors,
+int tof_2d_localize(const vec2 anc[], int num_anchors,
                     const double distances[],
-                    vec3 *pos_est);
+                    vec2 *pos_est);
 
 int calculate_anchor_geometry(double d01, double d02, double d03,
                               double d12, double d13, double d23,
-                              vec3 *a1, vec3 *a2, vec3 *a3);
+                              vec2 *a1, vec2 *a2, vec2 *a3);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* TOF_3D_SOLVER_H */
+#endif /* TOF_2D_SOLVER_H */

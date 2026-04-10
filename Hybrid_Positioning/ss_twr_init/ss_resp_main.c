@@ -16,10 +16,9 @@ extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
 extern float g_my_pos_x;
 extern float g_my_pos_y;
-extern float g_my_pos_z;
-extern void flash_config_write(uint8_t role, uint8_t id, float x, float y, float z);
+extern void flash_config_write(uint8_t role, uint8_t id, float x, float y);
 
-float my_pos_x = 0.0f, my_pos_y = 0.0f, my_pos_z = 0.0f;
+float my_pos_x = 0.0f, my_pos_y = 0.0f;
 static bool g_is_calibrating = false;
 
 static uint8_t tx_resp_msg[31] = {
@@ -89,23 +88,21 @@ static void robust_ble_blast_distances(uint8_t my_id, uint8_t t1, float d1, uint
 }
 
 void ss_responder_task_function(void *pvParameter) {
-    // Kéo tọa độ từ Flash. Nếu Flash trắng (0,0,0) thì gán tọa độ ảo mặc định
-    if (g_my_pos_x == 0.0f && g_my_pos_y == 0.0f && g_my_pos_z == 0.0f && g_current_node_id != 0) {
+    // Kéo tọa độ từ Flash. Nếu Flash trắng (0,0) thì gán tọa độ ảo mặc định cho 2D
+    if (g_my_pos_x == 0.0f && g_my_pos_y == 0.0f && g_current_node_id != 0) {
         if (g_current_node_id == 1) my_pos_x = 1.0f;
         else if (g_current_node_id == 2) my_pos_y = 1.0f;
-        else if (g_current_node_id == 3) my_pos_z = 1.0f;
+        else if (g_current_node_id == 3) { my_pos_x = 1.0f; my_pos_y = 1.0f; }
     } else {
         my_pos_x = g_my_pos_x;
         my_pos_y = g_my_pos_y;
-        my_pos_z = g_my_pos_z;
     }
 
     ble_raw_beacon_init(g_current_node_id);
-    printf("[A%d] READY. BOOT POS: (%.2f, %.2f, %.2f)\r\n", g_current_node_id, my_pos_x, my_pos_y, my_pos_z);
+    printf("[A%d] READY. BOOT POS: (%.2f, %.2f)\r\n", g_current_node_id, my_pos_x, my_pos_y);
     
     memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
     memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
-    memcpy(&tx_resp_msg[26], &my_pos_z, sizeof(float));
     tx_resp_msg[30] = g_current_node_id;
 
     TickType_t last_ble_tx = 0;
@@ -159,26 +156,25 @@ void ss_responder_task_function(void *pvParameter) {
                 
                 if (got_all_data) {
                     printf("[A0] ALL DATA RECEIVED. CALCULATING GEOMETRY...\r\n");
-                    vec3 a1, a2, a3;
+                    vec2 a1, a2, a3;
                     if (calculate_anchor_geometry(d01, d02, d03, d12, d13, d23, &a1, &a2, &a3)) {
                         
                         printf("[A0] GEOMETRY CALCULATED. Blasting via BLE for 6s...\r\n");
                         TickType_t blast_start = xTaskGetTickCount();
                         while (xTaskGetTickCount() - blast_start < pdMS_TO_TICKS(6000)) {
-                            ble_beacon_send_geometry(1, (float)a1.x, (float)a1.y, (float)a1.z); vTaskDelay(pdMS_TO_TICKS(15));
-                            ble_beacon_send_geometry(2, (float)a2.x, (float)a2.y, (float)a2.z); vTaskDelay(pdMS_TO_TICKS(15));
-                            ble_beacon_send_geometry(3, (float)a3.x, (float)a3.y, (float)a3.z); vTaskDelay(pdMS_TO_TICKS(15));
+                            ble_beacon_send_geometry(1, (float)a1.x, (float)a1.y); vTaskDelay(pdMS_TO_TICKS(15));
+                            ble_beacon_send_geometry(2, (float)a2.x, (float)a2.y); vTaskDelay(pdMS_TO_TICKS(15));
+                            ble_beacon_send_geometry(3, (float)a3.x, (float)a3.y); vTaskDelay(pdMS_TO_TICKS(15));
                         }
                         
-                        // LƯU TỌA ĐỘ VÀO FLASH CHO A0 (Gốc 0,0,0)
-                        my_pos_x = 0; my_pos_y = 0; my_pos_z = 0;
-                        g_my_pos_x = 0; g_my_pos_y = 0; g_my_pos_z = 0;
-                        printf("[A0] Saving pos to Flash: 0, 0, 0\r\n");
-                        flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y, my_pos_z);
+                        // LƯU TỌA ĐỘ VÀO FLASH CHO A0 (Gốc 0,0)
+                        my_pos_x = 0; my_pos_y = 0;
+                        g_my_pos_x = 0; g_my_pos_y = 0;
+                        printf("[A0] Saving pos to Flash: 0, 0\r\n");
+                        flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                         
                         memcpy(&tx_resp_msg[18], &my_pos_x, 4);
                         memcpy(&tx_resp_msg[22], &my_pos_y, 4);
-                        memcpy(&tx_resp_msg[26], &my_pos_z, 4);
                         
                         printf("[A0] SENDING 0xED TO TAG...\r\n");
                         uint8_t cmd[13] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xED, 0xFF, 0, 0};
@@ -213,16 +209,16 @@ void ss_responder_task_function(void *pvParameter) {
                 printf("[A1] WAITING FOR GEOMETRY FROM A0 (Max 8s)...\r\n");
                 TickType_t s = xTaskGetTickCount();
                 while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
-                    if (ble_scan_for_geometry(1, &my_pos_x, &my_pos_y, &my_pos_z)) {
-                        printf("\r\n[A1] <<< GEOMETRY UPDATED: (%.2f, %.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y, my_pos_z);
+                    if (ble_scan_for_geometry(1, &my_pos_x, &my_pos_y)) {
+                        printf("\r\n[A1] <<< GEOMETRY UPDATED: (%.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y);
                         // LƯU FLASH
-                        g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y; g_my_pos_z = my_pos_z;
-                        flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y, my_pos_z);
+                        g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y;
+                        flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                         printf("[A1] Saved to Flash permanently.\r\n");
                         break;
                     }
                 }
-                memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4); memcpy(&tx_resp_msg[26], &my_pos_z, 4);
+                memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4);
                 
             } else if (g_current_node_id == 2) {
                 printf("[A2] Responding to A0, A1 UWB requests (6s window)...\r\n");
@@ -236,16 +232,16 @@ void ss_responder_task_function(void *pvParameter) {
                 printf("[A2] WAITING FOR GEOMETRY FROM A0 (Max 8s)...\r\n");
                 TickType_t s = xTaskGetTickCount();
                 while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
-                    if (ble_scan_for_geometry(2, &my_pos_x, &my_pos_y, &my_pos_z)) {
-                        printf("\r\n[A2] <<< GEOMETRY UPDATED: (%.2f, %.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y, my_pos_z);
+                    if (ble_scan_for_geometry(2, &my_pos_x, &my_pos_y)) {
+                        printf("\r\n[A2] <<< GEOMETRY UPDATED: (%.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y);
                         // LƯU FLASH
-                        g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y; g_my_pos_z = my_pos_z;
-                        flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y, my_pos_z);
+                        g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y;
+                        flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                         printf("[A2] Saved to Flash permanently.\r\n");
                         break;
                     }
                 }
-                memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4); memcpy(&tx_resp_msg[26], &my_pos_z, 4);
+                memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4);
                 
             } else if (g_current_node_id == 3) {
                 printf("[A3] Responding to A0, A1, A2 UWB requests (8s window)...\r\n");
@@ -254,16 +250,16 @@ void ss_responder_task_function(void *pvParameter) {
                 printf("[A3] WAITING FOR GEOMETRY FROM A0 (Max 8s)...\r\n");
                 TickType_t s = xTaskGetTickCount();
                 while (xTaskGetTickCount() - s < pdMS_TO_TICKS(8000)) {
-                    if (ble_scan_for_geometry(3, &my_pos_x, &my_pos_y, &my_pos_z)) {
-                        printf("\r\n[A3] <<< GEOMETRY UPDATED: (%.2f, %.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y, my_pos_z);
+                    if (ble_scan_for_geometry(3, &my_pos_x, &my_pos_y)) {
+                        printf("\r\n[A3] <<< GEOMETRY UPDATED: (%.2f, %.2f) >>>\r\n", my_pos_x, my_pos_y);
                         // LƯU FLASH
-                        g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y; g_my_pos_z = my_pos_z;
-                        flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y, my_pos_z);
+                        g_my_pos_x = my_pos_x; g_my_pos_y = my_pos_y;
+                        flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                         printf("[A3] Saved to Flash permanently.\r\n");
                         break;
                     }
                 }
-                memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4); memcpy(&tx_resp_msg[26], &my_pos_z, 4);
+                memcpy(&tx_resp_msg[18], &my_pos_x, 4); memcpy(&tx_resp_msg[22], &my_pos_y, 4);
             }
             
             g_is_calibrating = false;
@@ -328,7 +324,7 @@ void ss_responder_task_function(void *pvParameter) {
                         g_is_calibrating = true;
                     } else {
                         // Nhận lệnh đổi Role, lưu Flash cả role, id và tọa độ
-                        flash_config_write(cfg.role, cfg.node_id, g_my_pos_x, g_my_pos_y, g_my_pos_z);
+                        flash_config_write(cfg.role, cfg.node_id, g_my_pos_x, g_my_pos_y);
                         vTaskDelay(pdMS_TO_TICKS(100));
                         NVIC_SystemReset();
                     }
@@ -341,13 +337,13 @@ void ss_responder_task_function(void *pvParameter) {
             #pragma pack(push, 1)
             typedef struct {
                 uint8_t start_byte; uint8_t id; uint8_t seq;
-                float x; float y; float z;
+                float x; float y;
             } ble_anchor_packed_t;
             #pragma pack(pop)
 
             ble_anchor_packed_t pkt;
             pkt.start_byte = '['; pkt.id = g_current_node_id;
-            pkt.x = my_pos_x; pkt.y = my_pos_y; pkt.z = my_pos_z;
+            pkt.x = my_pos_x; pkt.y = my_pos_y;
 
             for(int i = 0; i < 10; i++) {
                 pkt.seq = anchor_seq++;
