@@ -29,9 +29,10 @@
 //#define SIMULATION_MODE
 #include "simulation.c"
 
-// ===============================================================
-// BIẾN TOÀN CỤC CHO ROLE & TỌA ĐỘ LƯU FLASH
-// ===============================================================
+#ifndef USER_BUTTON_PIN
+#define USER_BUTTON_PIN 2 
+#endif
+
 uint8_t g_current_role = 0;
 uint8_t g_current_node_id = 0;
 uint16_t g_my_mac = 0;
@@ -39,15 +40,16 @@ uint16_t g_my_mac = 0;
 float g_my_pos_x = 0.0f;
 float g_my_pos_y = 0.0f;
 
-#define CONFIG_FLASH_ADDR 0x0007E000 // Sử dụng Page 126 ở cuối bộ nhớ Flash
+#define CONFIG_FLASH_ADDR 0x0007E000 
 
-// Hàm ghi Flash để lưu 2 tọa độ float (2D)
 void flash_config_write(uint8_t role, uint8_t id, float x, float y) {
-    NRF_NVMC->CONFIG = 2; // Bật chế độ XÓA (ERASE)
+    __disable_irq(); 
+    
+    NRF_NVMC->CONFIG = 2; 
     NRF_NVMC->ERASEPAGE = CONFIG_FLASH_ADDR;
     while(NRF_NVMC->READY == 0);
     
-    NRF_NVMC->CONFIG = 1; // Bật chế độ GHI (WRITE)
+    NRF_NVMC->CONFIG = 1; 
     uint32_t magic_word = 0xDEADBEEF;
     uint32_t config_data = (id << 8) | role;
     
@@ -61,20 +63,13 @@ void flash_config_write(uint8_t role, uint8_t id, float x, float y) {
     ((uint32_t*)CONFIG_FLASH_ADDR)[3] = raw_y;
     while(NRF_NVMC->READY == 0);
     
-    NRF_NVMC->CONFIG = 0; // Trả về chế độ ĐỌC (READ)
+    NRF_NVMC->CONFIG = 0; 
+    
+    __enable_irq(); 
 }
-// ===============================================================
 
 static dwt_config_t config = {
-    5,                     
-    DWT_PRF_64M,           
-    DWT_PLEN_128,          
-    DWT_PAC8,              
-    10, 10,                
-    0,                     
-    DWT_BR_6M8,            
-    DWT_PHRMODE_STD,       
-    (129 + 8 - 8)          
+    5, DWT_PRF_64M, DWT_PLEN_128, DWT_PAC8, 10, 10, 0, DWT_BR_6M8, DWT_PHRMODE_STD, (129 + 8 - 8)          
 };
 
 #define PRE_TIMEOUT 1000
@@ -92,6 +87,18 @@ static void led_toggle_task_function(void *pvParameter) {
     UNUSED_PARAMETER(pvParameter);
     while (true) {
         LEDS_INVERT(BSP_LED_0_MASK);
+
+        if (nrf_gpio_pin_read(USER_BUTTON_PIN) == 0) {
+            vTaskDelay(50); 
+            if (nrf_gpio_pin_read(USER_BUTTON_PIN) == 0) {
+                printf("\r\n=> USER BUTTON PRESSED! Ghi de Role & ID ve 0...\r\n");
+                flash_config_write(0, 0, g_my_pos_x, g_my_pos_y);
+                while(nrf_gpio_pin_read(USER_BUTTON_PIN) == 0) {
+                    vTaskDelay(10);
+                }
+                NVIC_SystemReset(); 
+            }
+        }
         vTaskDelay(TASK_DELAY);
     }
 }
@@ -107,11 +114,12 @@ extern void ss_responder_task_function(void *pvParameter);
 int main(void) {
     LEDS_CONFIGURE(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
     LEDS_ON(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
+    
+    nrf_gpio_cfg_input(USER_BUTTON_PIN, NRF_GPIO_PIN_PULLUP);
 
     g_my_mac = (uint16_t)(NRF_FICR->DEVICEADDR[0] & 0xFFFF);
     uint32_t *flash_ptr = (uint32_t*)CONFIG_FLASH_ADDR;
 
-    // Kéo toàn bộ Role, ID và Tọa độ từ Flash lúc khởi động
     if (flash_ptr[0] == 0xDEADBEEF) {
         g_current_role = (uint8_t)(flash_ptr[1] & 0xFF);
         g_current_node_id = (uint8_t)((flash_ptr[1] >> 8) & 0xFF);
@@ -131,14 +139,30 @@ int main(void) {
     if (g_current_role == 0) {
         printf("Chua co Role! Phat BLE MAC: %04X va cho lenh...\r\n", g_my_mac);
     } else {
-        printf("Da co Role: %d, ID: %d (MAC: %04X). Cho 3s xem co doi Role khong...\r\n", g_current_role, g_current_node_id, g_my_mac);
+        printf("Da co Role: %d, ID: %d (MAC: %04X). Cho vai giay xem co doi Role khong...\r\n", g_current_role, g_current_node_id, g_my_mac);
     }
 
     while (config_timeout > 0) {
+        if (nrf_gpio_pin_read(USER_BUTTON_PIN) == 0) {
+            nrf_delay_ms(50); 
+            if (nrf_gpio_pin_read(USER_BUTTON_PIN) == 0) {
+                printf("\r\n=> USER BUTTON PRESSED! Resetting Role & ID to 0...\r\n");
+                flash_config_write(0, 0, g_my_pos_x, g_my_pos_y);
+                while(nrf_gpio_pin_read(USER_BUTTON_PIN) == 0) {
+                    nrf_delay_ms(10);
+                }
+                NVIC_SystemReset();
+            }
+        }
+
         if (g_current_role == 0) {
-            char json_mac[30];
-            snprintf(json_mac, sizeof(json_mac), "{\"mac\":%u,\"role\":0}", g_my_mac);
-            ble_raw_beacon_send_payload((uint8_t*)json_mac, strlen(json_mac));
+            // Tối ưu bằng Binary thay vì JSON: 'U' + MAC
+            uint8_t pending_payload[3];
+            pending_payload[0] = 'U'; // Ký tự 'U' (ASCII 85) đánh dấu thiết bị chờ (Unconfigured)
+            pending_payload[1] = (uint8_t)(g_my_mac & 0xFF);
+            pending_payload[2] = (uint8_t)((g_my_mac >> 8) & 0xFF);
+            
+            ble_raw_beacon_send_payload(pending_payload, 3);
         }
 
         if (ble_scan_packet(scan_buf, &scan_len)) {
@@ -150,14 +174,16 @@ int main(void) {
                     uint8_t new_role = scan_buf[3];
                     uint8_t new_id = scan_buf[4];
                     printf("\r\n=> NHAN LENH DOI ROLE! Role moi: %d, ID: %d. Resetting...\r\n", new_role, new_id);
-                    // Reset đổi role giữ nguyên tọa độ cũ
                     flash_config_write(new_role, new_id, g_my_pos_x, g_my_pos_y);
                     nrf_delay_ms(500);
                     NVIC_SystemReset();
                 }
             }
         }
-        if (g_current_role != 0) config_timeout--;
+        if (g_current_role != 0) {
+            config_timeout--;
+            nrf_delay_ms(100); 
+        }
     }
 
     printf("Role hien tai chay: Role %d, Node ID: %d\r\n", g_current_role, g_current_node_id);
@@ -183,7 +209,6 @@ int main(void) {
     dwt_setrxtimeout(0);
 
 #ifdef SIMULATION_MODE
-    printf("[SIMULATION MODE] Running virtual UWB measurements...\r\n");
     while (1) {
         simulate_measurement_cycle();
         nrf_delay_ms(1000);
