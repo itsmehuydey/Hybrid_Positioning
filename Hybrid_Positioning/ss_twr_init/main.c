@@ -182,7 +182,7 @@ int main(void) {
         }
         if (g_current_role != 0) {
             config_timeout--;
-            nrf_delay_ms(100); 
+            nrf_delay_ms(1000); 
         }
     }
 
