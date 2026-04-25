@@ -254,3 +254,77 @@ int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y)
     }
     return 0;
 }
+
+// Hàm quét gói lệnh mới 'A' — có tọa độ x và y thực tế
+// Format: 'A'(1) + mac(2) + role(1) + id(1) + x(4) + y(4) = 13 bytes
+int ble_scan_for_anchor_config(anchor_config_t *out_config)
+{
+    uint16_t my_mac16 = (uint16_t)(NRF_FICR->DEVICEADDR[0] & 0xFFFF);
+
+    for (uint8_t ch = 0; ch < 3; ch++)
+    {
+        NRF_RADIO->FREQUENCY   = ble_freqs[ch];
+        NRF_RADIO->DATAWHITEIV = ble_ch_idx[ch];
+        NRF_RADIO->PACKETPTR   = (uint32_t)scan_buf;
+
+        NRF_RADIO->EVENTS_READY = 0;
+        NRF_RADIO->EVENTS_END   = 0;
+
+        NRF_RADIO->TASKS_RXEN = 1;
+        for (volatile int t = 0; t < 20000; t++) {
+            if (NRF_RADIO->EVENTS_READY) break;
+        }
+
+        if (!NRF_RADIO->EVENTS_READY) {
+            NRF_RADIO->TASKS_DISABLE = 1;
+            continue;
+        }
+
+        NRF_RADIO->TASKS_START = 1;
+
+        for (volatile int i = 0; i < 300000; i++)
+        {
+            if (NRF_RADIO->EVENTS_END)
+            {
+                NRF_RADIO->EVENTS_END = 0;
+                uint8_t pdu_len = scan_buf[1];
+
+                if (pdu_len >= 6) {
+                    uint8_t *p = scan_buf + 8;
+                    uint8_t remain = pdu_len - 6;
+
+                    while (remain > 0)
+                    {
+                        uint8_t fl = p[0];
+                        if (fl == 0 || fl + 1 > remain) break;
+
+                        // Tìm Manufacturer Data (0xFF) và Nordic CID (0x0059)
+                        if (p[1] == 0xFF && p[2] == (TARGET_CID & 0xFF) && p[3] == (TARGET_CID >> 8))
+                        {
+                            uint8_t payload_len = fl - 3;
+
+                            // Kiểm tra kích thước gói 'A': sizeof(anchor_config_t) = 13 byte
+                            if (payload_len >= sizeof(anchor_config_t)) {
+                                anchor_config_t *received_cfg = (anchor_config_t*)&p[4];
+
+                                // Kiểm tra Magic Byte 'A' và MAC khớp
+                                if (received_cfg->magic_byte == 'A' &&
+                                   (received_cfg->target_mac == my_mac16 || received_cfg->target_mac == 0xFFFF))
+                                {
+                                    memcpy(out_config, received_cfg, sizeof(anchor_config_t));
+                                    NRF_RADIO->TASKS_DISABLE = 1;
+                                    return 1; // Nhận thành công
+                                }
+                            }
+                        }
+                        remain -= (fl + 1);
+                        p += (fl + 1);
+                    }
+                }
+                break;
+            }
+        }
+        NRF_RADIO->TASKS_DISABLE = 1;
+    }
+    return 0;
+}

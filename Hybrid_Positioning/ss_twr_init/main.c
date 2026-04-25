@@ -24,7 +24,7 @@
 #include "utils.h"
 #include "ble_beacon.h"
 #include "ble_scanner.h"
-#include "ble_hybrid.h"
+//#include "ble_hybrid.h"
 
 //#define SIMULATION_MODE
 #include "simulation.c"
@@ -165,15 +165,31 @@ int main(void) {
             ble_raw_beacon_send_payload(pending_payload, 3);
         }
 
+        // --- Quét gói 'A' mới (có tọa độ x/y) ---
+        {
+            anchor_config_t acfg;
+            if (ble_scan_for_anchor_config(&acfg)) {
+                if (acfg.target_mac == g_my_mac || acfg.target_mac == 0xFFFF) {
+                    printf("\r\n=> NHAN LENH 'A'! Role: %d, ID: %d, X: %.2f, Y: %.2f. Saving & Reset...\r\n",
+                           acfg.role, acfg.node_id, acfg.x, acfg.y);
+                    flash_config_write(acfg.role, acfg.node_id, acfg.x, acfg.y);
+                    nrf_delay_ms(500);
+                    NVIC_SystemReset();
+                }
+            }
+        }
+
+        // --- Quét gói 'C' cũ (không có tọa độ, giữ tương thích ngược) ---
         if (ble_scan_packet(scan_buf, &scan_len)) {
             if (scan_len >= 5 && scan_buf[0] == 0x43) {
                 uint16_t target_mac;
                 memcpy(&target_mac, &scan_buf[1], 2);
-                
-                if (target_mac == g_my_mac) {
+
+                if (target_mac == g_my_mac || target_mac == 0xFFFF) {
                     uint8_t new_role = scan_buf[3];
-                    uint8_t new_id = scan_buf[4];
-                    printf("\r\n=> NHAN LENH DOI ROLE! Role moi: %d, ID: %d. Resetting...\r\n", new_role, new_id);
+                    uint8_t new_id   = scan_buf[4];
+                    printf("\r\n=> NHAN LENH 'C'! Role moi: %d, ID: %d. Resetting...\r\n", new_role, new_id);
+                    // Giữ tọa độ cũ nếu đã có
                     flash_config_write(new_role, new_id, g_my_pos_x, g_my_pos_y);
                     nrf_delay_ms(500);
                     NVIC_SystemReset();

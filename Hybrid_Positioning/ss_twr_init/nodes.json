@@ -1,0 +1,50 @@
+{
+  "_comment": "File cấu hình UWB Positioning System. Chỉnh sửa MAC và tọa độ thực tế rồi chạy: python config_tool.py --batch nodes.json",
+  "_instructions": [
+    "1. Dùng UART để đọc MAC 2 byte cuối của từng mạch (in ra lúc boot: 'MAC: XXXX')",
+    "2. Đo và điền tọa độ thực tế (mét) của từng anchor",
+    "3. Tag không cần tọa độ, để x=0 y=0",
+    "4. Chạy: python config_tool.py --batch nodes.json",
+    "5. Làm theo hướng dẫn trên màn hình (nhấn ENTER khi mạch sẵn sàng)"
+  ],
+  "repeat": 2,
+  "delay_between_s": 1.0,
+  "nodes": [
+    {
+      "mac":    "0001",   "_note": "⚠️ THAY MAC THỰC TẾ",
+      "role": 2, "id": 0,
+      "x": 0.00, "y": 0.00,
+      "_pos": "Anchor 0 — Góc gốc tọa độ (0,0)"
+    },
+    {
+      "mac":    "0002",   "_note": "⚠️ THAY MAC THỰC TẾ",
+      "role": 2, "id": 1,
+      "x": 3.00, "y": 0.00,
+      "_pos": "Anchor 1 — Cùng tường với A0, cách 3m"
+    },
+    {
+      "mac":    "0003",   "_note": "⚠️ THAY MAC THỰC TẾ",
+      "role": 2, "id": 2,
+      "x": 0.00, "y": 2.50,
+      "_pos": "Anchor 2 — Tường đối diện A0"
+    },
+    {
+      "mac":    "0004",   "_note": "⚠️ THAY MAC THỰC TẾ",
+      "role": 2, "id": 3,
+      "x": 3.00, "y": 2.50,
+      "_pos": "Anchor 3 — Góc đối diện"
+    },
+    {
+      "mac":    "0005",   "_note": "⚠️ THAY MAC THỰC TẾ",
+      "role": 1, "id": 0,
+      "x": 0.00, "y": 0.00,
+      "_pos": "Tag 0 — Trên bàn (tọa độ sẽ được tính động)"
+    },
+    {
+      "mac":    "0006",   "_note": "⚠️ THAY MAC THỰC TẾ",
+      "role": 1, "id": 1,
+      "x": 0.00, "y": 0.00,
+      "_pos": "Tag 1 — Gần cửa sổ (tọa độ sẽ được tính động)"
+    }
+  ]
+}

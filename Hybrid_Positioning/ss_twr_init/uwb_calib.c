@@ -10,8 +10,8 @@
 #define UUS_TO_DWT_TIME            65536
 #define TX_ANT_DLY                 16436 
 #define SPEED_OF_LIGHT             299702547.0
-#define FREQ_OFFSET_MULTIPLIER     (998.4e6 / 2.0 / 1024.0 / 131072.0)
-#define HERTZ_TO_PPM_MULTIPLIER_CHAN_5 (-1.0e6 / 6489.6e6)
+//#define FREQ_OFFSET_MULTIPLIER     (998.4e6 / 2.0 / 1024.0 / 131072.0)
+//#define HERTZ_TO_PPM_MULTIPLIER_CHAN_5 (-1.0e6 / 6489.6e6)
 
 // Thêm biến bù trừ phần mềm (Antenna Delay Offset). Giá trị 0.52 tương đương 52cm sai số.
 #define UWB_HARDWARE_OFFSET        0.52f 
