@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "C/C++ Runner: Debug Session",
+      "type": "cppdbg",
+      "request": "launch",
+      "args": [],
+      "stopAtEntry": false,
+      "externalConsole": true,
+      "cwd": "d:/252_DATN/NRF-252/Hybrid_Positioning/Hybrid_Positioning/ss_twr_init",
+      "program": "d:/252_DATN/NRF-252/Hybrid_Positioning/Hybrid_Positioning/ss_twr_init/build/Debug/outDebug",
+      "MIMode": "gdb",
+      "miDebuggerPath": "gdb",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        }
+      ]
+    }
+  ]
+}
