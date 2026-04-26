@@ -81,13 +81,26 @@ static dwt_config_t config = {
 
 TaskHandle_t led_task_handle = NULL;
 TaskHandle_t uwb_task_handle = NULL;
-TimerHandle_t led_timer_handle = NULL;
+
+// Đã xóa led_timer_handle để tránh xung đột và quy về 1 hàm quản lý LED duy nhất
 
 static void led_toggle_task_function(void *pvParameter) {
     UNUSED_PARAMETER(pvParameter);
-    while (true) {
-        LEDS_INVERT(BSP_LED_0_MASK);
+    
+    // Tắt toàn bộ LED trước khi bắt đầu Task
+    LEDS_OFF(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
 
+    while (true) {
+        // Phân loại nháy LED dựa trên Role khi đã vào FreeRTOS
+        if (g_current_role == 1 || g_current_role == 99) {
+            LEDS_INVERT(BSP_LED_1_MASK);               // TAG nháy LED 1
+            LEDS_OFF(BSP_LED_0_MASK | BSP_LED_2_MASK);
+        } else if (g_current_role == 2) {
+            LEDS_INVERT(BSP_LED_2_MASK);               // ANCHOR nháy LED 2
+            LEDS_OFF(BSP_LED_0_MASK | BSP_LED_1_MASK);
+        }
+
+        // Xử lý nút bấm Reset Role
         if (nrf_gpio_pin_read(USER_BUTTON_PIN) == 0) {
             vTaskDelay(50); 
             if (nrf_gpio_pin_read(USER_BUTTON_PIN) == 0) {
@@ -103,17 +116,12 @@ static void led_toggle_task_function(void *pvParameter) {
     }
 }
 
-static void led_toggle_timer_callback(void *pvParameter) {
-    UNUSED_PARAMETER(pvParameter);
-    LEDS_INVERT(BSP_LED_1_MASK);
-}
-
 extern void ss_initiator_task_function(void *pvParameter);
 extern void ss_responder_task_function(void *pvParameter);
 
 int main(void) {
     LEDS_CONFIGURE(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
-    LEDS_ON(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
+    LEDS_OFF(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK); // Khởi tạo tắt hết
     
     nrf_gpio_cfg_input(USER_BUTTON_PIN, NRF_GPIO_PIN_PULLUP);
 
@@ -135,9 +143,10 @@ int main(void) {
     uint32_t config_timeout = (g_current_role == 0) ? 0xFFFFFFFF : 5; 
     uint8_t scan_buf[64];
     uint16_t scan_len;
+    uint32_t unconfig_timer = 0; // Biến đếm thời gian cho Role 0
     
     if (g_current_role == 0) {
-        printf("Chua co Role! Phat BLE MAC: %04X va cho lenh...\r\n", g_my_mac);
+        printf("Chua co Role! Phat BLE MAC: %04X moi 5 giay va cho lenh...\r\n", g_my_mac);
     } else {
         printf("Da co Role: %d, ID: %d (MAC: %04X). Cho vai giay xem co doi Role khong...\r\n", g_current_role, g_current_node_id, g_my_mac);
     }
@@ -156,13 +165,24 @@ int main(void) {
         }
 
         if (g_current_role == 0) {
-            // Tối ưu bằng Binary thay vì JSON: 'U' + MAC
-            uint8_t pending_payload[3];
-            pending_payload[0] = 'U'; // Ký tự 'U' (ASCII 85) đánh dấu thiết bị chờ (Unconfigured)
-            pending_payload[1] = (uint8_t)(g_my_mac & 0xFF);
-            pending_payload[2] = (uint8_t)((g_my_mac >> 8) & 0xFF);
+            // unconfig_timer tăng 1 mỗi 10ms.
+            // 500 * 10ms = 5000ms (5 giây) gửi tín hiệu BLE 1 lần
+            if (unconfig_timer % 500 == 0) {
+                uint8_t pending_payload[3];
+                pending_payload[0] = 'U'; 
+                pending_payload[1] = (uint8_t)(g_my_mac & 0xFF);
+                pending_payload[2] = (uint8_t)((g_my_mac >> 8) & 0xFF);
+                
+                ble_raw_beacon_send_payload(pending_payload, 3);
+            }
             
-            ble_raw_beacon_send_payload(pending_payload, 3);
+            // 50 * 10ms = 500ms nháy LED 0 một lần để báo hiệu Unconfigured
+            if (unconfig_timer % 50 == 0) {
+                LEDS_INVERT(BSP_LED_0_MASK);
+            }
+            LEDS_OFF(BSP_LED_1_MASK | BSP_LED_2_MASK); // Giữ các LED khác tắt
+            
+            unconfig_timer++;
         }
 
         if (ble_scan_packet(scan_buf, &scan_len)) {
@@ -180,17 +200,20 @@ int main(void) {
                 }
             }
         }
+
         if (g_current_role != 0) {
             config_timeout--;
             nrf_delay_ms(1000); 
+        } else {
+            // Giảm delay xuống 10ms thay vì không có delay, vừa tạo chu kỳ đếm, vừa không lỡ gói BLE Scan
+            nrf_delay_ms(10); 
         }
     }
 
     printf("Role hien tai chay: Role %d, Node ID: %d\r\n", g_current_role, g_current_node_id);
 
-    xTaskCreate(led_toggle_task_function, "LED0", configMINIMAL_STACK_SIZE + 200, NULL, 2, &led_task_handle);
-    led_timer_handle = xTimerCreate("LED1", TIMER_PERIOD, pdTRUE, NULL, led_toggle_timer_callback);
-    xTimerStart(led_timer_handle, 0);
+    // Chạy duy nhất Task quản lý LED (đã bỏ led_timer_handle)
+    xTaskCreate(led_toggle_task_function, "LED_TASK", configMINIMAL_STACK_SIZE + 200, NULL, 2, &led_task_handle);
 
     nrf_gpio_cfg_input(DW1000_IRQ, NRF_GPIO_PIN_NOPULL);
     reset_DW1000();
