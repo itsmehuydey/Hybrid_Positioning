@@ -11,7 +11,7 @@
 #include "ble_scanner.h"
 #include "utils.h"
 
-#define MAX_ANCHORS 10 
+#define MAX_ANCHORS 4 
 #define SPEED_OF_LIGHT 299702547.0
 #define FREQ_OFFSET_MULTIPLIER          (998.4e6 / 2.0 / 1024.0 / 131072.0)
 #define HERTZ_TO_PPM_MULTIPLIER_CHAN_5  (-1.0e6 / 6489.6e6)

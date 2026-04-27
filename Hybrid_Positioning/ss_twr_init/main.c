@@ -119,7 +119,7 @@ static void led_toggle_task_function(void *pvParameter) {
 extern void ss_initiator_task_function(void *pvParameter);
 extern void ss_responder_task_function(void *pvParameter);
 
-int main(void) {
+ int main(void) {
     LEDS_CONFIGURE(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
     LEDS_OFF(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK); // Khởi tạo tắt hết
     
