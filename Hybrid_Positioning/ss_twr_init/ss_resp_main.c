@@ -125,10 +125,7 @@ void ss_responder_task_function(void *pvParameter) {
     memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
     tx_resp_msg[30] = g_current_node_id;
 
-    TickType_t last_ble_tx = 0;
-    TickType_t last_ble_scan = 0; 
     TickType_t last_status_log = 0;
-    static uint8_t anchor_seq = 0; 
 
     while (1) {
         if (g_is_calibrating) {
@@ -152,7 +149,6 @@ void ss_responder_task_function(void *pvParameter) {
 
                 printf("[A0] WAITING FOR BLE DISTANCES FROM A1, A2 (Max 15s)...\r\n");
                 
-                // Tăng thời gian chờ lên 15s vì A1, A2 cần thời gian lấy 50 mẫu
                 while (xTaskGetTickCount() - s < pdMS_TO_TICKS(15000)) {
                     if(xTaskGetTickCount() - last_wait_log > pdMS_TO_TICKS(2000)) {
                         printf("[A0] Still waiting BLE... Current: d12=%.2f, d13=%.2f, d23=%.2f\r\n", d12, d13, d23);
@@ -286,11 +282,12 @@ void ss_responder_task_function(void *pvParameter) {
 
         TickType_t now = xTaskGetTickCount();
         if (now - last_status_log > pdMS_TO_TICKS(3000)) {
-            printf("[A%d] STATUS: LISTENING FOR UWB & BLE...\r\n", g_current_node_id);
+            printf("[A%d] STATUS: LISTENING FOR UWB & BLE COORDS...\r\n", g_current_node_id);
             last_status_log = now;
         }
 
-        dwt_setrxtimeout(65000);
+        // 1. NGHE UWB (Response mode)
+        dwt_setrxtimeout(65000); // Lắng nghe UWB trong ~65ms
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
         dwt_rxenable(DWT_START_RX_IMMEDIATE);
         while (!(dwt_read32bitreg(SYS_STATUS_ID) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
@@ -323,40 +320,36 @@ void ss_responder_task_function(void *pvParameter) {
             } else dwt_rxreset();
         } else dwt_rxreset();
 
-        if (now - last_ble_scan > pdMS_TO_TICKS(2000)) {
-            web_config_t cfg;
-            if (ble_scan_for_config(&cfg)) {
-                if (cfg.target_mac == g_my_mac || cfg.target_mac == 0xFFFF) {
-                    if (cfg.role == 99 && cfg.node_id == 0) {
-                        g_is_calibrating = true;
-                    } else {
-                        flash_config_write(cfg.role, cfg.node_id, g_my_pos_x, g_my_pos_y);
-                        vTaskDelay(pdMS_TO_TICKS(100));
-                        NVIC_SystemReset();
-                    }
+        // 2. NGHE BLE LỆNH ĐỔI ROLE TỪ PI/WEB
+        web_config_t cfg;
+        if (ble_scan_for_config(&cfg)) {
+            if (cfg.target_mac == g_my_mac || cfg.target_mac == 0xFFFF) {
+                if (cfg.role == 99 && cfg.node_id == 0) {
+                    g_is_calibrating = true;
+                } else {
+                    flash_config_write(cfg.role, cfg.node_id, g_my_pos_x, g_my_pos_y);
+                    vTaskDelay(pdMS_TO_TICKS(100));
+                    NVIC_SystemReset();
                 }
             }
-            last_ble_scan = now;
         }
 
-        if (now - last_ble_tx > pdMS_TO_TICKS(5000)) {
-            #pragma pack(push, 1)
-            typedef struct {
-                uint8_t start_byte; uint8_t id; uint8_t seq;
-                float x; float y;
-            } ble_anchor_packed_t;
-            #pragma pack(pop)
-
-            ble_anchor_packed_t pkt;
-            pkt.start_byte = '['; pkt.id = g_current_node_id;
-            pkt.x = my_pos_x; pkt.y = my_pos_y;
-
-            for(int i = 0; i < 3; i++) {
-                pkt.seq = anchor_seq++;
-                ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
-                vTaskDelay(pdMS_TO_TICKS(15));
+        // 3. NGHE BLE TỌA ĐỘ MỚI TỪ PI/WEB
+        float new_x = 0.0f, new_y = 0.0f;
+        if (ble_scan_for_geometry(g_current_node_id, &new_x, &new_y)) {
+            // Chỉ ghi Flash và đổi biến nếu tọa độ khác với hiện tại để tiết kiệm bộ nhớ
+            if (new_x != my_pos_x || new_y != my_pos_y) {
+                printf("\r\n[A%d] <<< RECEIVED NEW POS VIA BLE: (%.2f, %.2f) >>>\r\n", g_current_node_id, new_x, new_y);
+                my_pos_x = new_x;
+                my_pos_y = new_y;
+                g_my_pos_x = new_x;
+                g_my_pos_y = new_y;
+                flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
+                
+                // Nhúng tọa độ mới nhất vào bản tin UWB để đẩy về Tag
+                memcpy(&tx_resp_msg[18], &my_pos_x, 4);
+                memcpy(&tx_resp_msg[22], &my_pos_y, 4);
             }
-            last_ble_tx = now;
         }
     }
 }
