@@ -418,6 +418,8 @@ void ss_responder_task_function(void *pvParameter) {
 
             // 0xE0 = normal poll (unicast by anchor ID)
             if (rx_buffer[9] == 0xE0 && rx_buffer[10] == g_current_node_id) {
+                printf("[A%d] Nhan duoc UWB Poll tu Tag! Dang tra loi...\r\n", g_current_node_id);
+
                 uint64_t poll_rx_ts   = get_rx_timestamp_u64();
                 uint32_t resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
                 dwt_setdelayedtrxtime(resp_tx_time);
