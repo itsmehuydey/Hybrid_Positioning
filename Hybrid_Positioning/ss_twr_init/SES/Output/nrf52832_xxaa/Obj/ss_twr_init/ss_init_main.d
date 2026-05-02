@@ -9,6 +9,7 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/string.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/math.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/__SEGGER_RTL_FP.h \
+ C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdlib.h \
  ../../../nRF5_SDK_14.2.0/external/freertos/source/include/FreeRTOS.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stddef.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdint.h \
@@ -17,7 +18,6 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o: \
  ../../../nRF5_SDK_14.2.0/components/device/compiler_abstraction.h \
  ../../../nRF5_SDK_14.2.0/components/device/nrf.h \
  ../../../nRF5_SDK_14.2.0/components/device/nrf52.h \
- C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/stdlib.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/time.h \
  C:/Program\ Files/SEGGER/SEGGER\ Embedded\ Studio\ 8.24/include/sys/time.h \
  D:/OLD_D/nRF5_SDK_17.1.0_ddde560/components/toolchain/cmsis/include/core_cm4.h \

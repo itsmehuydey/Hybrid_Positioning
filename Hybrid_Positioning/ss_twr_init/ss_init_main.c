@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdlib.h> // Thêm thư viện để dùng random
 #include "FreeRTOS.h"
 #include "task.h"
 #include "deca_device_api.h"
@@ -13,13 +14,12 @@
 
 #define MAX_ANCHORS 4 
 #define SPEED_OF_LIGHT 299702547.0
-#define FREQ_OFFSET_MULTIPLIER          (998.4e6 / 2.0 / 1024.0 / 131072.0)
-#define HERTZ_TO_PPM_MULTIPLIER_CHAN_5  (-1.0e6 / 6489.6e6)
+
+// Đã xóa 2 define bị trùng lặp ở đây để trình biên dịch không báo vàng
 
 extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
 extern uint8_t g_current_role; 
-// Cập nhật tham số truyền vào của hàm Flash
 extern void flash_config_write(uint8_t role, uint8_t id, float x, float y);
 
 static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f, 1.0f}; 
@@ -34,7 +34,8 @@ static float anchor_offset[MAX_ANCHORS] = {0};
 static bool is_calibrated[MAX_ANCHORS] = {false};
 static bool g_is_calibrating = false;
 
-static uint8_t tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
+// Tăng kích thước mảng lên 14 bytes, dùng byte 11 cho Tag ID
+static uint8_t tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0};
 static uint8_t rx_buffer[32]; 
 static uint16_t g_cycle_id = 0;
 static vec2 g_tag_pos_est = {0.0, 0.0};
@@ -90,6 +91,9 @@ void ss_initiator_task_function(void *pvParameter) {
 
     static uint8_t tag_seq = 0; 
     TickType_t last_status_log = xTaskGetTickCount();
+
+    // Tạo mầm ngẫu nhiên dựa trên MAC để các Tag tản nhau ra
+    srand(g_my_mac + g_current_node_id);
 
     while (1) {
         if (g_is_calibrating) {
@@ -150,7 +154,6 @@ void ss_initiator_task_function(void *pvParameter) {
 
             if (g_current_role == 99) {
                 printf("[TAG] CALIBRATION FINISHED. REVERTING FLASH TO ROLE 1 AND RESETTING...\r\n");
-                // Ghi đè Role về 1, tọa độ của Tag thì set mặc định 0,0
                 flash_config_write(1, g_current_node_id, 0.0f, 0.0f);
                 vTaskDelay(pdMS_TO_TICKS(100));
                 NVIC_SystemReset();
@@ -170,6 +173,9 @@ void ss_initiator_task_function(void *pvParameter) {
             reset_uwb_state(); 
             vTaskDelay(pdMS_TO_TICKS(5)); 
             tx_poll_msg[10] = (uint8_t)a; 
+            
+            // Lớp bảo vệ Logic: Gắn Tag ID vào byte 11
+            tx_poll_msg[11] = g_current_node_id; 
             tx_poll_msg[2]++;          
 
             dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
@@ -181,7 +187,9 @@ void ss_initiator_task_function(void *pvParameter) {
 
                 if (dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_RXFCG) {
                     dwt_readrxdata(rx_buffer, 32, 0); 
-                    if (rx_buffer[9] == 0xE1) {
+                    
+                    // Lớp bảo vệ Logic: Đảm bảo gói 0xE1 có chứa đúng Tag ID của mình
+                    if (rx_buffer[9] == 0xE1 && rx_buffer[26] == g_current_node_id) {
                         uint32_t t_round_t = dwt_readtxtimestamplo32();
                         uint32_t t_round_r = dwt_readrxtimestamplo32();
                         uint32_t t_reply_r = *(uint32_t*)&rx_buffer[10];
@@ -190,7 +198,8 @@ void ss_initiator_task_function(void *pvParameter) {
                         int32_t rtd_init = (int32_t)(t_round_r - t_round_t);
                         int32_t rtd_resp = (int32_t)(t_reply_t - t_reply_r);
 
-                        float clockOffsetRatio = dwt_readcarrierintegrator() * (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6);
+                        // Lưu ý: Các tham số này đã nằm ngầm trong deca_device_api.h
+                        float clockOffsetRatio = dwt_readcarrierintegrator() * ( (998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
                         double tof = ((double)rtd_init - (double)rtd_resp * (1.0f - clockOffsetRatio)) / 2.0;
                         float raw_dist = (float)(tof * DWT_TIME_UNITS * SPEED_OF_LIGHT);
 
@@ -271,6 +280,9 @@ void ss_initiator_task_function(void *pvParameter) {
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(1000)); 
+        
+        // Lớp bảo vệ Vật lý: Random Jitter thay cho vTaskDelay(1000) cố định
+        uint32_t random_delay_ms = 150 + (rand() % 151); // Random từ 150ms đến 300ms
+        vTaskDelay(pdMS_TO_TICKS(random_delay_ms)); 
     }
 }

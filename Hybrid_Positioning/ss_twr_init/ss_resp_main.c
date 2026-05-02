@@ -307,6 +307,9 @@ void ss_responder_task_function(void *pvParameter) {
             }
 
             if (rx_buffer[9] == 0xE0 && rx_buffer[10] == g_current_node_id) {
+                // Trích xuất ID của Tag vừa hỏi
+                uint8_t incoming_tag_id = rx_buffer[11]; 
+
                 uint64_t poll_rx_ts = get_rx_timestamp_u64();
                 uint32_t resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
                 dwt_setdelayedtrxtime(resp_tx_time);
@@ -314,6 +317,9 @@ void ss_responder_task_function(void *pvParameter) {
 
                 resp_msg_set_ts(&tx_resp_msg[10], poll_rx_ts);
                 resp_msg_set_ts(&tx_resp_msg[14], resp_tx_ts);
+
+                // Dội ngược Tag ID vào gói trả lời
+                tx_resp_msg[26] = incoming_tag_id; 
 
                 dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
                 dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
