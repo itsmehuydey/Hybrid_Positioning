@@ -25,4 +25,9 @@ void ble_beacon_send_geometry(uint8_t target_id, float x, float y);
    ========================================================================= */
 void ble_beacon_send_tag_pos(uint8_t id, uint8_t seq, uint32_t timestamp, float x, float y);
 
+// === THÊM MỚI ===
+/* Hàm báo sự hiện diện của Anchor (ID, Tọa độ) */
+void ble_beacon_send_presence(uint8_t id, float x, float y);
+// ================
+
 #endif

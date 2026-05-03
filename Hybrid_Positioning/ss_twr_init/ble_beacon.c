@@ -177,3 +177,19 @@ void ble_beacon_send_tag_pos(uint8_t id, uint8_t seq, uint32_t timestamp, float 
 
     ble_raw_beacon_send_payload(payload, 15);
 }
+
+// === THÊM MỚI ===
+void ble_beacon_send_presence(uint8_t id, float x, float y)
+{
+    uint8_t payload[10];
+    payload[0] = 'P'; // Magic byte 'P': Presence (Sự hiện diện)
+    payload[1] = id;
+    
+    // Đính kèm luôn tọa độ của Anchor để Tag đỡ phải nhớ
+    memcpy(&payload[2], &x, 4);
+    memcpy(&payload[6], &y, 4);
+
+    // Tận dụng hàm gửi broadcast sẵn có
+    ble_raw_beacon_send_payload(payload, 10);
+}
+// ================

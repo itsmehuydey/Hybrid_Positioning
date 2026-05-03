@@ -31,4 +31,12 @@ int ble_scan_for_config(web_config_t *out_config);
 int ble_scan_packet(uint8_t *out, uint16_t *out_len);
 int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y);
 
+// === THÊM MỚI ===
+/**
+ * @brief Quét gói Presence của Anchor để lấy ID, Tọa độ và RSSI
+ * @return 1 nếu bắt được gói Presence, 0 nếu không
+ */
+int ble_scan_presence_with_rssi(uint8_t *out_id, float *out_x, float *out_y, int8_t *out_rssi);
+// ================
+
 #endif

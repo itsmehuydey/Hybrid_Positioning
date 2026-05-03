@@ -48,6 +48,10 @@ void ble_scanner_init(void)
         (RADIO_CRCCNF_SKIPADDR_Skip << RADIO_CRCCNF_SKIPADDR_Pos);
 
     NRF_RADIO->PACKETPTR = (uint32_t)scan_buf;
+    
+    // === THÊM MỚI: Bật tính năng đo RSSI tự động ===
+    NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk; 
+    // ===============================================
 }
 
 int ble_scan_for_config(web_config_t *out_config)
@@ -254,3 +258,75 @@ int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y)
     }
     return 0;
 }
+
+// === THÊM MỚI ===
+int ble_scan_presence_with_rssi(uint8_t *out_id, float *out_x, float *out_y, int8_t *out_rssi)
+{
+    for (uint8_t ch = 0; ch < 3; ch++)
+    {
+        NRF_RADIO->FREQUENCY   = ble_freqs[ch];
+        NRF_RADIO->DATAWHITEIV = ble_ch_idx[ch];
+        NRF_RADIO->PACKETPTR   = (uint32_t)scan_buf;
+
+        NRF_RADIO->EVENTS_READY = 0;
+        NRF_RADIO->EVENTS_END   = 0;
+
+        NRF_RADIO->TASKS_RXEN = 1;
+        for (volatile int t = 0; t < 20000; t++) {
+            if (NRF_RADIO->EVENTS_READY) break;
+        }
+
+        if (!NRF_RADIO->EVENTS_READY) {
+            NRF_RADIO->TASKS_DISABLE = 1;
+            continue;
+        }
+
+        NRF_RADIO->TASKS_START = 1;
+
+        for (volatile int i = 0; i < 300000; i++)
+        {
+            if (NRF_RADIO->EVENTS_END)
+            {
+                NRF_RADIO->EVENTS_END = 0;
+                uint8_t pdu_len = scan_buf[1];
+
+                if (pdu_len >= 6) {
+                    uint8_t *p = scan_buf + 8;
+                    uint8_t remain = pdu_len - 6;
+
+                    while (remain > 0)
+                    {
+                        uint8_t fl = p[0];
+                        if (fl == 0 || fl + 1 > remain) break;
+
+                        if (p[1] == 0xFF && p[2] == (TARGET_CID & 0xFF) && p[3] == (TARGET_CID >> 8))
+                        {
+                            uint8_t payload_len = fl - 3;
+                            if (payload_len >= 10) { 
+                                uint8_t magic = p[4];
+                                if (magic == 'P') { // Bắt đúng gói Presence
+                                    *out_id = p[5];
+                                    memcpy(out_x, &p[6], 4);
+                                    memcpy(out_y, &p[10], 4);
+                                    
+                                    // ĐỌC RSSI
+                                    uint8_t sample = NRF_RADIO->RSSISAMPLE;
+                                    *out_rssi = -(int8_t)sample; 
+
+                                    NRF_RADIO->TASKS_DISABLE = 1;
+                                    return 1;
+                                }
+                            }
+                        }
+                        remain -= (fl + 1);
+                        p += (fl + 1);
+                    }
+                }
+                break;
+            }
+        }
+        NRF_RADIO->TASKS_DISABLE = 1;
+    }
+    return 0;
+}
+// ================
