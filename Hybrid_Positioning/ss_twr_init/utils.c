@@ -165,3 +165,40 @@ int calculate_anchor_geometry(double d01, double d02, double d03,
 
     return 1;
 }
+
+/* ============================================================
+   Bộ lọc 2D Exponential Moving Average (EMA) cho Tag
+   ============================================================ */
+void ema_2d_init(ema_2d_t *filter, double alpha) {
+    if (!filter) return;
+    filter->x = 0.0;
+    filter->y = 0.0;
+    
+    // Ràng buộc alpha trong khoảng (0, 1]
+    if (alpha <= 0.0) alpha = 0.01;
+    if (alpha > 1.0) alpha = 1.0;
+    
+    filter->alpha = alpha;
+    filter->initialized = 0;
+}
+
+vec2 ema_2d_update(ema_2d_t *filter, vec2 raw_meas) {
+    if (!filter) return raw_meas;
+
+    // Nếu là điểm đầu tiên, gán luôn giá trị đo được làm mốc
+    if (!filter->initialized) {
+        filter->x = raw_meas.x;
+        filter->y = raw_meas.y;
+        filter->initialized = 1;
+    } else {
+        // Công thức EMA: S_t = alpha * Y_t + (1 - alpha) * S_{t-1}
+        filter->x = filter->alpha * raw_meas.x + (1.0 - filter->alpha) * filter->x;
+        filter->y = filter->alpha * raw_meas.y + (1.0 - filter->alpha) * filter->y;
+    }
+
+    vec2 smoothed_pos;
+    smoothed_pos.x = filter->x;
+    smoothed_pos.y = filter->y;
+    
+    return smoothed_pos;
+}

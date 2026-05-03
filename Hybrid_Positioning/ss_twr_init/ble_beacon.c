@@ -159,3 +159,21 @@ void ble_beacon_send_geometry(uint8_t target_id, float x, float y)
     // Tận dụng hàm gửi broadcast đã có sẵn
     ble_raw_beacon_send_payload(payload, 10);
 }
+
+/* =========================================================================
+   HÀM MỚI: Đóng gói và gửi tọa độ Tag kèm Timestamp (15 bytes)
+   ========================================================================= */
+void ble_beacon_send_tag_pos(uint8_t id, uint8_t seq, uint32_t timestamp, float x, float y)
+{
+    uint8_t payload[15];
+    
+    payload[0] = '{';         // Byte nhận diện cho Tag: 0x7B
+    payload[1] = id;          // Tag ID
+    payload[2] = seq;         // Sequence để check rớt gói
+    
+    memcpy(&payload[3], &timestamp, 4); // 4 byte thời gian RTOS
+    memcpy(&payload[7], &x, 4);         // 4 byte X
+    memcpy(&payload[11], &y, 4);        // 4 byte Y
+
+    ble_raw_beacon_send_payload(payload, 15);
+}

@@ -15,8 +15,6 @@
 #define MAX_ANCHORS 4 
 #define SPEED_OF_LIGHT 299702547.0
 
-// Đã xóa 2 define bị trùng lặp ở đây để trình biên dịch không báo vàng
-
 extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
 extern uint8_t g_current_role; 
@@ -34,7 +32,6 @@ static float anchor_offset[MAX_ANCHORS] = {0};
 static bool is_calibrated[MAX_ANCHORS] = {false};
 static bool g_is_calibrating = false;
 
-// Tăng kích thước mảng lên 14 bytes, dùng byte 11 cho Tag ID
 static uint8_t tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0, 0};
 static uint8_t rx_buffer[32]; 
 static uint16_t g_cycle_id = 0;
@@ -92,7 +89,10 @@ void ss_initiator_task_function(void *pvParameter) {
     static uint8_t tag_seq = 0; 
     TickType_t last_status_log = xTaskGetTickCount();
 
-    // Tạo mầm ngẫu nhiên dựa trên MAC để các Tag tản nhau ra
+    // 1. Khởi tạo bộ lọc EMA
+    ema_2d_t tag_ema_filter;
+    ema_2d_init(&tag_ema_filter, 0.4); 
+
     srand(g_my_mac + g_current_node_id);
 
     while (1) {
@@ -174,7 +174,6 @@ void ss_initiator_task_function(void *pvParameter) {
             vTaskDelay(pdMS_TO_TICKS(5)); 
             tx_poll_msg[10] = (uint8_t)a; 
             
-            // Lớp bảo vệ Logic: Gắn Tag ID vào byte 11
             tx_poll_msg[11] = g_current_node_id; 
             tx_poll_msg[2]++;          
 
@@ -188,7 +187,6 @@ void ss_initiator_task_function(void *pvParameter) {
                 if (dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_RXFCG) {
                     dwt_readrxdata(rx_buffer, 32, 0); 
                     
-                    // Lớp bảo vệ Logic: Đảm bảo gói 0xE1 có chứa đúng Tag ID của mình
                     if (rx_buffer[9] == 0xE1 && rx_buffer[26] == g_current_node_id) {
                         uint32_t t_round_t = dwt_readtxtimestamplo32();
                         uint32_t t_round_r = dwt_readrxtimestamplo32();
@@ -198,7 +196,6 @@ void ss_initiator_task_function(void *pvParameter) {
                         int32_t rtd_init = (int32_t)(t_round_r - t_round_t);
                         int32_t rtd_resp = (int32_t)(t_reply_t - t_reply_r);
 
-                        // Lưu ý: Các tham số này đã nằm ngầm trong deca_device_api.h
                         float clockOffsetRatio = dwt_readcarrierintegrator() * ( (998.4e6/2.0/1024.0/131072.0) * (-1.0e6/6489.6e6) / 1.0e6);
                         double tof = ((double)rtd_init - (double)rtd_resp * (1.0f - clockOffsetRatio)) / 2.0;
                         float raw_dist = (float)(tof * DWT_TIME_UNITS * SPEED_OF_LIGHT);
@@ -230,39 +227,31 @@ void ss_initiator_task_function(void *pvParameter) {
             }
         } 
 
-        float tag_x = 0.0f, tag_y = 0.0f;
-        if (calculate_tag_position(&tag_x, &tag_y)) {
+        float raw_tag_x = 0.0f, raw_tag_y = 0.0f;
+        if (calculate_tag_position(&raw_tag_x, &raw_tag_y)) {
+            
+            // 2. Chạy qua bộ lọc EMA
+            vec2 raw_pos = {raw_tag_x, raw_tag_y};
+            vec2 smooth_pos = ema_2d_update(&tag_ema_filter, raw_pos);
+
             float d0 = anchors_info[0].is_valid ? anchors_info[0].dist : 0.0f;
             float d1 = anchors_info[1].is_valid ? anchors_info[1].dist : 0.0f;
             float d2 = anchors_info[2].is_valid ? anchors_info[2].dist : 0.0f;
             float d3 = anchors_info[3].is_valid ? anchors_info[3].dist : 0.0f;
 
-            printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"measuring\",\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f,%.2f]}\r\n", 
-                   g_current_node_id, tag_x, tag_y, d0, d1, d2, d3);
+            uint32_t current_timestamp = xTaskGetTickCount(); // Lấy thời gian MCU
 
-            #pragma pack(push, 1)
-            typedef struct {
-                uint8_t start_byte; 
-                uint8_t id; 
-                uint8_t seq;
-                float x; 
-                float y; 
-            } ble_packed_data_t;
-            #pragma pack(pop)
+            printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"measuring\",\"timestamp\":%lu,\"raw_x\":%.2f,\"raw_y\":%.2f,\"ema_x\":%.2f,\"ema_y\":%.2f,\"d\":[%.2f,%.2f,%.2f,%.2f]}\r\n", 
+                   g_current_node_id, current_timestamp, raw_tag_x, raw_tag_y, smooth_pos.x, smooth_pos.y, d0, d1, d2, d3);
 
-            ble_packed_data_t pkt;
-            pkt.start_byte = '{'; 
-            pkt.id = g_current_node_id;
-            pkt.x = tag_x; 
-            pkt.y = tag_y; 
-
-            for(int i = 0; i < 10; i++) {
-                pkt.seq = tag_seq++;
-                ble_raw_beacon_send_payload((uint8_t *)&pkt, sizeof(pkt));
+            for(int i = 0; i < 5; i++) {
+                ble_beacon_send_tag_pos(g_current_node_id, tag_seq++, current_timestamp, smooth_pos.x, smooth_pos.y);
                 vTaskDelay(pdMS_TO_TICKS(15));
             }
+            
         } else {
             printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"waiting_for_anchors\"}\r\n", g_current_node_id);
+            tag_ema_filter.initialized = 0; 
         }
 
         web_config_t cfg;
@@ -281,7 +270,6 @@ void ss_initiator_task_function(void *pvParameter) {
             }
         }
         
-        // Lớp bảo vệ Vật lý: Random Jitter thay cho vTaskDelay(1000) cố định
         uint32_t random_delay_ms = 150 + (rand() % 151); // Random từ 150ms đến 300ms
         vTaskDelay(pdMS_TO_TICKS(random_delay_ms)); 
     }

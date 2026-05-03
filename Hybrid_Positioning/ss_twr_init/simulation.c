@@ -1,179 +1,179 @@
 #ifdef SIMULATION_MODE
+
 #include <stdio.h>
 #include <math.h>
-#include <string.h>
 #include <stdlib.h>
+
+#include "utils.h"
+#include "gmc_kalman.h"
 
 #ifndef N_ANCHORS
 #define N_ANCHORS 4
 #endif
 
-/* ===================== SIM CONFIG 2D ===================== */
-
-#define SIM_TRUE_POS_X      3.4
-#define SIM_TRUE_POS_Y      2.1
-#define SIM_TRUE_POS_Z      0.0  /* Không dùng trong 2D */
-
-/* Hằng số tốc độ ánh sáng */
 #define C0 299792458.0
+#define TOF_NOISE_STD (0.08 / C0)
 
-/* Sai số mô phỏng TOF (0.15m noise) */
-#define TOF_NOISE_STD       (0.15 / C0)
+/* ================= ANCHORS ================= */
+static vec2 true_anchors[N_ANCHORS];
+static vec2 calc_anchors[N_ANCHORS];
 
-/* Định nghĩa Vector 2D */
-typedef struct {
-    double x;
-    double y;
-} vec2;
-
-vec2 anc[N_ANCHORS];
-static double sim_time = 0.0;
-
-/* ===================== UTILS ===================== */
-
-static double dist_2d(vec2 a, vec2 b) {
-    return sqrt((a.x - b.x)*(a.x - b.x) + (a.y - b.y)*(a.y - b.y));
+/* ================= UTIL ================= */
+static double dist_2d(vec2 a, vec2 b)
+{
+    double dx = a.x - b.x;
+    double dy = a.y - b.y;
+    return sqrt(dx*dx + dy*dy);
 }
 
-/* Hàm tạo Gaussian noise đơn giản */
+/* Gaussian noise generator */
 static double gauss_noise(double std)
 {
     static int has_spare = 0;
     static double spare;
-    if (has_spare) { 
-        has_spare = 0; 
-        return spare;  // <--- SỬA Ở ĐÂY: Bỏ "* std" đi
-    }
 
+    if (has_spare) {
+        has_spare = 0;
+        return spare;
+    }
     has_spare = 1;
+
     double u1 = (rand() + 1.0) / (RAND_MAX + 1.0);
     double u2 = (rand() + 1.0) / (RAND_MAX + 1.0);
+
     double mag = std * sqrt(-2.0 * log(u1));
+
     spare = mag * sin(2.0 * M_PI * u2);
     return mag * cos(2.0 * M_PI * u2);
 }
 
-/* ===================== SENSOR SIMULATION ===================== */
-
-/* Giả lập đo khoảng cách ToF có nhiễu */
-static double simulate_tof_measurement(int anchor_id)
-{
-    vec2 tag_pos = {SIM_TRUE_POS_X, SIM_TRUE_POS_Y};
-    double true_dist = dist_2d(tag_pos, anc[anchor_id]);
-    double tof_true = true_dist / C0;
-    
-    /* Thêm nhiễu Gauss vào thời gian bay */
-    double measured_tof = tof_true + gauss_noise(TOF_NOISE_STD);
-    
-    /* Trả về khoảng cách (mét) */
-    return measured_tof * C0;
-}
-
-/* ===================== 2D TOF SOLVER (Levenberg-Marquardt) ===================== */
-
-/* Giải hệ phương trình 2D ToF bằng LM (giống bản Python) */
-static vec2 solve_2d_tof_lm(double *distances, vec2 init_guess, int max_iter, double tol)
-{
-    double curr_x = init_guess.x;
-    double curr_y = init_guess.y;
-    double lam = 0.01; /* Damping factor */
-
-    for (int iter = 0; iter < max_iter; iter++) {
-        double jtj[2][2] = {{0.0, 0.0}, {0.0, 0.0}};
-        double jtf[2] = {0.0, 0.0};
-        double max_step = 0.0;
-
-        for (int i = 0; i < N_ANCHORS; i++) {
-            double dx = curr_x - anc[i].x;
-            double dy = curr_y - anc[i].y;
-            double r_est = sqrt(dx*dx + dy*dy);
-            
-            if (r_est < 1e-6) r_est = 1e-6; // Tránh chia cho 0
-
-            double res = r_est - distances[i];
-            
-            // Jacobian
-            double df_dx = dx / r_est;
-            double df_dy = dy / r_est;
-
-            // Tích lũy JTJ và JTf
-            jtj[0][0] += df_dx * df_dx;
-            jtj[0][1] += df_dx * df_dy;
-            jtj[1][0] += df_dy * df_dx;
-            jtj[1][1] += df_dy * df_dy;
-
-            jtf[0] += df_dx * res;
-            jtf[1] += df_dy * res;
-        }
-
-        // Thêm Levenberg-Marquardt damping
-        jtj[0][0] += lam;
-        jtj[1][1] += lam;
-
-        // Cramer's rule giải hệ 2x2
-        double det = jtj[0][0] * jtj[1][1] - jtj[0][1] * jtj[1][0];
-        if (fabs(det) < 1e-12) {
-            break; // Ma trận suy biến
-        }
-
-        double delta_x = (-jtf[0] * jtj[1][1] - (-jtf[1] * jtj[0][1])) / det;
-        double delta_y = (jtj[0][0] * (-jtf[1]) - jtj[1][0] * (-jtf[0])) / det;
-
-        curr_x += delta_x;
-        curr_y += delta_y;
-
-        max_step = sqrt(delta_x*delta_x + delta_y*delta_y);
-        
-        if (max_step < tol) {
-            break; // Hội tụ
-        }
-    }
-
-    vec2 result = {curr_x, curr_y};
-    return result;
-}
-
-/* ===================== MAIN SIMULATION ===================== */
-
+/* ================= SIMULATION CORE ================= */
 void simulate_measurement_cycle(void)
 {
-    static int initialized = 0;
+    static int init = 0;
+    static int tick = 0;
+    double sim_time = tick * 0.2;
 
-    if (!initialized) {
-        /* Thiết lập tọa độ 4 Anchor (2D) */
-        anc[0] = (vec2){0.0, 0.0};
-        anc[1] = (vec2){6.0, 0.0};
-        anc[2] = (vec2){6.0, 4.0};
-        anc[3] = (vec2){0.0, 4.0};
+    static IMM_GMC_Kalman4D_t imm_filter;
+    static vec2 tag_pos;
+    static vec2 tag_vel;
 
-        srand(42); // Cố định seed để dễ debug
-        initialized = 1;
+    if (!init) {
+        true_anchors[0] = (vec2){0, 0};
+        true_anchors[1] = (vec2){6, 0};
+        true_anchors[2] = (vec2){6, 4};
+        true_anchors[3] = (vec2){0, 4};
+
+        srand(42);
+
+        printf("\n=== [INIT] ANCHOR GEOMETRY ESTIMATION ===\n");
+
+        double d01 = dist_2d(true_anchors[0], true_anchors[1]);
+        double d02 = dist_2d(true_anchors[0], true_anchors[2]);
+        double d03 = dist_2d(true_anchors[0], true_anchors[3]);
+        double d12 = dist_2d(true_anchors[1], true_anchors[2]);
+        double d13 = dist_2d(true_anchors[1], true_anchors[3]);
+        double d23 = dist_2d(true_anchors[2], true_anchors[3]);
+
+        calc_anchors[0] = (vec2){0, 0};
+
+        if (calculate_anchor_geometry(d01, d02, d03, d12, d13, d23,
+                                      &calc_anchors[1], &calc_anchors[2], &calc_anchors[3])) {
+            for(int i=0; i<4; i++) {
+                printf("  Anchor %d: (%.2f, %.2f)\n",
+                       i, calc_anchors[i].x, calc_anchors[i].y);
+            }
+        } else {
+            printf("Anchor geometry estimation FAILED\n");
+        }
+
+        tag_pos = (vec2){1.0, 1.0};
+        tag_vel = (vec2){0.0, 0.0};
+
+        imm_gmc_init(&imm_filter, 0.8, 0.05, 1.5, 0.5);
+        imm_gmc_reset(&imm_filter, tag_pos.x, tag_pos.y);
+
+        init = 1;
     }
 
-    sim_time += 0.5;
-    double measured_distances[N_ANCHORS];
+    int is_outlier = 0;
+    vec2 target_vel = {0.0, 0.0};
 
-    printf("\n=== [SIM 2D ToF CYCLE] t=%.1f s ===\n", sim_time);
-
-    /* 1. Đo khoảng cách từ Tag đến các Anchor */
-    printf("Measured Distances:\n");
-    for (int i = 0; i < N_ANCHORS; ++i) {
-        measured_distances[i] = simulate_tof_measurement(i);
-        printf("  Anchor %d: %.3f m\n", i, measured_distances[i]);
+    /* Motion scenario */
+    if (sim_time < 5.0) {
+        target_vel = (vec2){0.0, 0.0};
+    } 
+    else if (sim_time < 14.0) {
+        target_vel = (vec2){1.2, 0.8};
+    } 
+    else {
+        target_vel = (vec2){0.0, 0.0};
     }
 
-    /* 2. Giải tọa độ bằng ToF (LM 2D Solver) */
-    vec2 init_guess = {3.0, 2.0}; // Lấy điểm giữa làm điểm bắt đầu
-    vec2 est_pos = solve_2d_tof_lm(measured_distances, init_guess, 50, 1e-4);
+    /* Velocity smoothing */
+    double vel_alpha = 0.85;
+    tag_vel.x = vel_alpha * tag_vel.x + (1.0 - vel_alpha) * target_vel.x;
+    tag_vel.y = vel_alpha * tag_vel.y + (1.0 - vel_alpha) * target_vel.y;
 
-    /* 3. Đánh giá sai số */
-    vec2 true_pos = {SIM_TRUE_POS_X, SIM_TRUE_POS_Y};
-    double err = dist_2d(est_pos, true_pos);
+    /* Position update */
+    tag_pos.x += tag_vel.x * 0.2 + gauss_noise(0.005);
+    tag_pos.y += tag_vel.y * 0.2 + gauss_noise(0.005);
 
-    /* ===== OUTPUT ===== */
-    printf("TRUE POS      = (%.3f , %.3f)\n", true_pos.x, true_pos.y);
-    printf("EST TOF 2D    = (%.3f , %.3f)\n", est_pos.x, est_pos.y);
-    printf("ERROR         = %.3f m\n", err);
+    double d[N_ANCHORS];
+
+    for (int i = 0; i < N_ANCHORS; i++) {
+        double true_dist = dist_2d(tag_pos, calc_anchors[i]);
+
+        /* NLOS injection */
+        if (i == 1 && sim_time >= 15.0 && sim_time <= 18.0) {
+            true_dist += 3.5;
+            is_outlier = 1;
+        }
+
+        double tof = true_dist / C0 + gauss_noise(TOF_NOISE_STD);
+        d[i] = tof * C0;
+    }
+
+    vec2 raw_est = {0, 0};
+    tof_2d_localize(calc_anchors, N_ANCHORS, d, &raw_est);
+
+    imm_gmc_predict(&imm_filter, 0.2);
+    vec2 filt_est = imm_gmc_update(&imm_filter, raw_est);
+
+    /* ================= LOG OUTPUT ================= */
+    int should_print = 0;
+
+    if (tick == 5)   should_print = 1;
+    if (tick == 26)  should_print = 1;
+    if (tick == 45)  should_print = 1;
+    if (tick == 71)  should_print = 1;
+    if (tick == 80)  should_print = 1;
+    if (tick == 95)  should_print = 1;
+
+    if (should_print) {
+        printf("\n=== [SIM IMM-GMC 4D] t=%.1f s ===\n", sim_time);
+
+        if (tick == 5)   printf("STATE: STATIC (Jitter test)\n");
+        if (tick == 26)  printf("STATE: MOTION START\n");
+        if (tick == 45)  printf("STATE: STEADY MOTION\n");
+        if (tick == 71)  printf("STATE: DECELERATION / STOP\n");
+        if (tick == 80)  printf("WARNING: NLOS ERROR 3.5m AT ANCHOR 1\n");
+        if (tick == 95)  printf("STATE: RECOVERED / STABLE\n");
+
+        printf("TRUE POSITION     = (%5.2f, %5.2f)\n", tag_pos.x, tag_pos.y);
+
+        printf("RAW ESTIMATION    = (%5.2f, %5.2f) | Error: %.3fm\n",
+               raw_est.x, raw_est.y, dist_2d(raw_est, tag_pos));
+
+        printf("FILTERED ESTIMATE = (%5.2f, %5.2f) | Error: %.3fm\n",
+               filt_est.x, filt_est.y, dist_2d(filt_est, tag_pos));
+
+        printf("IMM MODE PROB     = Static: %3.0f%% | Dynamic: %3.0f%%\n",
+               imm_filter.mode_prob[0] * 100,
+               imm_filter.mode_prob[1] * 100);
+    }
+
+    tick++;
 }
 
-#endif // SIMULATION_MODE
+#endif
