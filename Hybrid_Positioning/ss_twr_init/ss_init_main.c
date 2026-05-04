@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
-#include <stdlib.h> // Thêm thư viện để dùng random
+#include <stdlib.h> 
 #include "FreeRTOS.h"
 #include "task.h"
 #include "deca_device_api.h"
@@ -12,16 +12,13 @@
 #include "ble_scanner.h"
 #include "utils.h"
 
-#define MAX_ANCHORS 4 
+#define MAX_ANCHORS 10
 #define SPEED_OF_LIGHT 299702547.0
 
 extern uint8_t g_current_node_id;
 extern uint16_t g_my_mac;
 extern uint8_t g_current_role; 
 extern void flash_config_write(uint8_t role, uint8_t id, float x, float y);
-
-static const float HARDCODED_ANCHOR_X[MAX_ANCHORS] = {0.0f, 1.0f, 0.0f, 1.0f}; 
-static const float HARDCODED_ANCHOR_Y[MAX_ANCHORS] = {0.0f, 0.0f, 1.0f, 1.0f};
 
 #define CALIB_SAMPLES 10                  
 #define CALIB_TRUE_DISTANCE 1.0f          
@@ -57,6 +54,7 @@ bool calculate_tag_position(float *out_x, float *out_y) {
 
     uint32_t current_tick = xTaskGetTickCount();
     for (int i = 0; i < MAX_ANCHORS; i++) {
+        // Chỉ lấy những Anchor vừa đo thành công trong khoảng 2 giây
         if (anchors_info[i].is_valid && (current_tick - anchors_info[i].last_update_tick < pdMS_TO_TICKS(2000))) {
             valid_anchors[count].x = (double)anchors_info[i].x;
             valid_anchors[count].y = (double)anchors_info[i].y;
@@ -64,7 +62,11 @@ bool calculate_tag_position(float *out_x, float *out_y) {
             count++;
         }
     }
+    
+    // Yêu cầu tối thiểu 3 Anchor để tính tọa độ 2D
     if (count < 3) return false; 
+    
+    // Gửi mảng Anchor và Khoảng cách sạch vào hàm LM có tính Trọng số (IRLS)
     if (tof_2d_localize(valid_anchors, count, valid_distances, &g_tag_pos_est) > 0) {
         *out_x = (float)g_tag_pos_est.x; *out_y = (float)g_tag_pos_est.y;
         return true;
@@ -89,7 +91,6 @@ void ss_initiator_task_function(void *pvParameter) {
     static uint8_t tag_seq = 0; 
     TickType_t last_status_log = xTaskGetTickCount();
 
-    // 1. Khởi tạo bộ lọc EMA
     ema_2d_t tag_ema_filter;
     ema_2d_init(&tag_ema_filter, 0.4); 
 
@@ -101,7 +102,8 @@ void ss_initiator_task_function(void *pvParameter) {
             printf("[TAG] TRIGGER CALIBRATION -> SENDING 0xEC\r\n");
             printf("==========================================\r\n");
             
-            for (int a = 0; a < MAX_ANCHORS; a++) {
+            // Lệnh 0xEC báo hiệu Calib
+            for (int a = 0; a < 4; a++) {
                 tx_poll_msg[9] = 0xEC;
                 tx_poll_msg[10] = (uint8_t)a; 
                 
@@ -168,12 +170,18 @@ void ss_initiator_task_function(void *pvParameter) {
         }
 
         g_cycle_id++;
+        int active_anchors = 0; 
         
+        // ========================================================
+        // QUÉT ROUND-ROBIN QUA TẤT CẢ ANCHOR BẰNG SÓNG UWB TRỰC TIẾP
+        // ========================================================
         for (int a = 0; a < MAX_ANCHORS; a++) {
             reset_uwb_state(); 
-            vTaskDelay(pdMS_TO_TICKS(5)); 
-            tx_poll_msg[10] = (uint8_t)a; 
             
+            // Wait cực ngắn giữa các Anchor để triệt tiêu sóng phản xạ
+            vTaskDelay(pdMS_TO_TICKS(3)); 
+            
+            tx_poll_msg[10] = (uint8_t)a; 
             tx_poll_msg[11] = g_current_node_id; 
             tx_poll_msg[2]++;          
 
@@ -211,11 +219,19 @@ void ss_initiator_task_function(void *pvParameter) {
                             }
                             float dist = raw_dist - anchor_offset[a];
                             if (dist <= 0.0f) dist = 0.01f;
-                            anchors_info[a].x = HARDCODED_ANCHOR_X[a];
-                            anchors_info[a].y = HARDCODED_ANCHOR_Y[a];
+                            
+                            // LẤY TỌA ĐỘ ĐỘNG TRỰC TIẾP TỪ GÓI RESPONSE CỦA ANCHOR
+                            float ax_from_uwb, ay_from_uwb;
+                            memcpy(&ax_from_uwb, &rx_buffer[18], 4);
+                            memcpy(&ay_from_uwb, &rx_buffer[22], 4);
+
+                            anchors_info[a].x = ax_from_uwb;
+                            anchors_info[a].y = ay_from_uwb;
                             anchors_info[a].dist = dist;
                             anchors_info[a].last_update_tick = xTaskGetTickCount();
                             anchors_info[a].is_valid = true;
+                            
+                            active_anchors++;
                         }
                     } else if (rx_buffer[9] == 0xEC) {
                         if (!g_is_calibrating) {
@@ -227,22 +243,31 @@ void ss_initiator_task_function(void *pvParameter) {
             }
         } 
 
+        // ========================================================
+        // TÍNH TOÁN & XUẤT JSON ĐỘNG THEO SỐ ANCHOR THỰC TẾ
+        // ========================================================
         float raw_tag_x = 0.0f, raw_tag_y = 0.0f;
         if (calculate_tag_position(&raw_tag_x, &raw_tag_y)) {
             
-            // 2. Chạy qua bộ lọc EMA
             vec2 raw_pos = {raw_tag_x, raw_tag_y};
             vec2 smooth_pos = ema_2d_update(&tag_ema_filter, raw_pos);
 
-            float d0 = anchors_info[0].is_valid ? anchors_info[0].dist : 0.0f;
-            float d1 = anchors_info[1].is_valid ? anchors_info[1].dist : 0.0f;
-            float d2 = anchors_info[2].is_valid ? anchors_info[2].dist : 0.0f;
-            float d3 = anchors_info[3].is_valid ? anchors_info[3].dist : 0.0f;
+            uint32_t current_timestamp = xTaskGetTickCount();
 
-            uint32_t current_timestamp = xTaskGetTickCount(); // Lấy thời gian MCU
+            char dist_str[200] = "[";
+            bool first = true;
+            for(int i = 0; i < MAX_ANCHORS; i++) {
+                if (anchors_info[i].is_valid && (current_timestamp - anchors_info[i].last_update_tick < pdMS_TO_TICKS(2000))) {
+                    char temp[30];
+                    sprintf(temp, "%s{\"A%d\":%.2f}", first ? "" : ",", i, anchors_info[i].dist);
+                    strcat(dist_str, temp);
+                    first = false;
+                }
+            }
+            strcat(dist_str, "]");
 
-            printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"measuring\",\"timestamp\":%lu,\"raw_x\":%.2f,\"raw_y\":%.2f,\"ema_x\":%.2f,\"ema_y\":%.2f,\"d\":[%.2f,%.2f,%.2f,%.2f]}\r\n", 
-                   g_current_node_id, current_timestamp, raw_tag_x, raw_tag_y, smooth_pos.x, smooth_pos.y, d0, d1, d2, d3);
+            printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"measuring\",\"timestamp\":%lu,\"raw_x\":%.2f,\"raw_y\":%.2f,\"ema_x\":%.2f,\"ema_y\":%.2f,\"d\":%s}\r\n", 
+                   g_current_node_id, current_timestamp, raw_tag_x, raw_tag_y, smooth_pos.x, smooth_pos.y, dist_str);
 
             for(int i = 0; i < 5; i++) {
                 ble_beacon_send_tag_pos(g_current_node_id, tag_seq++, current_timestamp, smooth_pos.x, smooth_pos.y);
@@ -250,7 +275,7 @@ void ss_initiator_task_function(void *pvParameter) {
             }
             
         } else {
-            printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"waiting_for_anchors\"}\r\n", g_current_node_id);
+            printf("{\"id\":%d,\"type\":\"tag\",\"status\":\"waiting_for_anchors\",\"found\":%d}\r\n", g_current_node_id, active_anchors);
             tag_ema_filter.initialized = 0; 
         }
 
@@ -270,7 +295,7 @@ void ss_initiator_task_function(void *pvParameter) {
             }
         }
         
-        uint32_t random_delay_ms = 150 + (rand() % 151); // Random từ 150ms đến 300ms
+        uint32_t random_delay_ms = 50 + (rand() % 51); 
         vTaskDelay(pdMS_TO_TICKS(random_delay_ms)); 
     }
 }

@@ -32,13 +32,10 @@ static uint8_t tx_resp_msg[31] = {
 
 static uint8_t rx_buffer[64];
 
-// ======================================================================
-// Lấy 50 mẫu UWB, lọc nhiễu dội tường (Trimmed Mean) rồi tính trung bình
-// ======================================================================
 static float average_measure_tof(uint8_t target, uint8_t my_id) {
     float samples[50];
     int count = 0;
-    int max_tries = 150; // Thử tối đa 150 lần để đảm bảo vớt đủ 50 mẫu
+    int max_tries = 150; 
     
     printf("[A%d] Sampling 50 dists to A%d...\r\n", my_id, target);
     for (int i = 0; i < max_tries && count < 50; i++) { 
@@ -51,7 +48,6 @@ static float average_measure_tof(uint8_t target, uint8_t my_id) {
     }
     
     if (count > 0) {
-        // Sắp xếp mảng từ nhỏ đến lớn (Bubble Sort)
         for (int i = 0; i < count - 1; i++) {
             for (int j = 0; j < count - i - 1; j++) {
                 if (samples[j] > samples[j+1]) {
@@ -62,7 +58,6 @@ static float average_measure_tof(uint8_t target, uint8_t my_id) {
             }
         }
         
-        // Loại bỏ 20% nhiễu cao (dội tường) và 20% nhiễu thấp
         int trim = count / 5; 
         float sum = 0.0f;
         int valid_count = 0;
@@ -121,12 +116,13 @@ void ss_responder_task_function(void *pvParameter) {
     ble_raw_beacon_init(g_current_node_id);
     printf("[A%d] READY. BOOT POS: (%.2f, %.2f)\r\n", g_current_node_id, my_pos_x, my_pos_y);
     
+    // Đổ tọa độ khởi động vào gói UWB để gửi về Tag
     memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
     memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
     tx_resp_msg[30] = g_current_node_id;
 
     TickType_t last_ble_scan = 0; 
-    TickType_t last_ble_geom_scan = 1000; // Khởi tạo lệch đi 1s so với config scan
+    TickType_t last_ble_geom_scan = 1000; 
     TickType_t last_status_log = 0;
 
     while (1) {
@@ -191,6 +187,7 @@ void ss_responder_task_function(void *pvParameter) {
                         printf("[A0] Saving pos to Flash: 0, 0\r\n");
                         flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                         
+                        // Đổ lại vào gói UWB
                         memcpy(&tx_resp_msg[18], &my_pos_x, 4);
                         memcpy(&tx_resp_msg[22], &my_pos_y, 4);
                         
@@ -307,7 +304,6 @@ void ss_responder_task_function(void *pvParameter) {
             }
 
             if (rx_buffer[9] == 0xE0 && rx_buffer[10] == g_current_node_id) {
-                // Trích xuất ID của Tag vừa hỏi
                 uint8_t incoming_tag_id = rx_buffer[11]; 
 
                 uint64_t poll_rx_ts = get_rx_timestamp_u64();
@@ -321,8 +317,10 @@ void ss_responder_task_function(void *pvParameter) {
                 // Dội ngược Tag ID vào gói trả lời
                 tx_resp_msg[26] = incoming_tag_id; 
 
+                // Gửi toàn bộ mảng gồm cả ToF timestamps và tọa độ về cho Tag
                 dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
                 dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
+                
                 if (dwt_starttx(DWT_START_TX_DELAYED) == DWT_SUCCESS) {
                     while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
                     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
@@ -330,9 +328,6 @@ void ss_responder_task_function(void *pvParameter) {
             } else dwt_rxreset();
         } else dwt_rxreset();
 
-        // =========================================================
-        // 2. NGHE LỆNH CẤU HÌNH BLE (Chu kỳ 2 giây/lần)
-        // =========================================================
         if (now - last_ble_scan > pdMS_TO_TICKS(2000)) {
             web_config_t cfg;
             if (ble_scan_for_config(&cfg)) {
@@ -349,11 +344,7 @@ void ss_responder_task_function(void *pvParameter) {
             last_ble_scan = now;
         }
 
-        // =========================================================
-        // 3. LẮNG NGHE TỌA ĐỘ MỚI QUA BLE (Chu kỳ 3 giây/lần)
-        // Bọc trong Timer để không gây chèn nghẽn (block) UWB
-        // =========================================================
-        if (now - last_ble_geom_scan > pdMS_TO_TICKS(3000)) {
+        if (now - last_ble_geom_scan > pdMS_TO_TICKS(1000)) {
             float new_x = 0.0f, new_y = 0.0f;
             if (ble_scan_for_geometry(g_current_node_id, &new_x, &new_y)) {
                 if (new_x != my_pos_x || new_y != my_pos_y) {
@@ -365,6 +356,7 @@ void ss_responder_task_function(void *pvParameter) {
                     
                     flash_config_write(g_current_role, g_current_node_id, my_pos_x, my_pos_y);
                     
+                    // Cập nhật ngay lập tức vào mảng trả lời UWB
                     memcpy(&tx_resp_msg[18], &my_pos_x, 4);
                     memcpy(&tx_resp_msg[22], &my_pos_y, 4);
                 }

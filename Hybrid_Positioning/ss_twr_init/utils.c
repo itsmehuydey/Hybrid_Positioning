@@ -24,16 +24,20 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
         pos_est->y = 0.0;
     }
 
-    double curr_x, curr_y;
+    // Tận dụng vị trí ước lượng cũ làm điểm bắt đầu (Initial guess)
+    double curr_x = pos_est->x;
+    double curr_y = pos_est->y;
 
-    /* ===== Initial guess: anchor gần nhất ===== */
-    int min_i = 0;
-    for (int i = 1; i < num_anchors; i++) {
-        if (distances[i] < distances[min_i])
-            min_i = i;
+    /* ===== Initial guess: anchor gần nhất (Nếu chưa có vị trí cũ hợp lệ) ===== */
+    if (fabs(curr_x) < 1e-3 && fabs(curr_y) < 1e-3) {
+        int min_i = 0;
+        for (int i = 1; i < num_anchors; i++) {
+            if (distances[i] < distances[min_i])
+                min_i = i;
+        }
+        curr_x = anc[min_i].x;
+        curr_y = anc[min_i].y;
     }
-    curr_x = anc[min_i].x;
-    curr_y = anc[min_i].y;
 
     double lambda = 0.1;
     const int max_it = 50;
@@ -44,7 +48,7 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
         double jtf[2] = {0};
         double curr_cost = 0.0;
 
-        /* ===== Build system 2x2 ===== */
+        /* ===== Build system 2x2 với Trọng số phần dư (IRLS) ===== */
         for (int i = 0; i < num_anchors; i++) {
 
             double dx = curr_x - anc[i].x;
@@ -53,17 +57,26 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
             double r = sqrt(dx*dx + dy*dy);
             if (r < 1e-6) r = 1e-6;
 
+            // Tính phần dư (Residual): r_i = khoảng_cách_lý_thuyết - khoảng_cách_thực_đo
             double res = r - distances[i];
-            curr_cost += res * res;
+            
+            // Tính trọng số w = 1 / (|res| + 0.1) để tự động giảm nhiễu từ các Anchor đo sai
+            double w = 1.0 / (fabs(res) + 0.1); 
+
+            curr_cost += w * res * res; // Hàm chi phí có trọng số
 
             double jx = dx / r;
             double jy = dy / r;
 
-            jtj[0][0] += jx * jx; jtj[0][1] += jx * jy;
-            jtj[1][0] += jy * jx; jtj[1][1] += jy * jy;
+            // Nhân trọng số w vào ma trận J^T * W * J
+            jtj[0][0] += w * jx * jx; 
+            jtj[0][1] += w * jx * jy;
+            jtj[1][0] += w * jy * jx; 
+            jtj[1][1] += w * jy * jy;
 
-            jtf[0] += jx * res;
-            jtf[1] += jy * res;
+            // Nhân trọng số w vào vector J^T * W * res
+            jtf[0] += w * jx * res;
+            jtf[1] += w * jy * res;
         }
 
         /* ===== LM damping ===== */
@@ -111,8 +124,12 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
             double tx = next_x - anc[i].x;
             double ty = next_y - anc[i].y;
             double tr = sqrt(tx*tx + ty*ty);
+            
             double res = tr - distances[i];
-            next_cost += res * res;
+            
+            // Cập nhật lại trọng số cho vị trí test mới
+            double w = 1.0 / (fabs(res) + 0.1); 
+            next_cost += w * res * res;
         }
 
         /* ===== Accept / Reject ===== */
