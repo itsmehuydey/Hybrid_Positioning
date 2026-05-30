@@ -1,0 +1,75 @@
+# Build and Object Files
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.exe
+*.elf
+*.hex
+*.bin
+*.map
+*.d
+
+# SEGGER Embedded Studio (SES) Output
+SES/Output/
+SES/RTE/
+*.emSession
+*.elay
+
+# IDE and Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+*.cbp
+
+# KEIL µVision
+*.uvguix.*
+*.uvprojx
+*.uvopt
+
+# IAR Embedded Workbench
+*.ewp
+*.eww
+*.ewd
+*.ewl
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Dependency Directories (Large, should be managed separately)
+# Uncomment if you want to exclude the SDK
+# nRF5_SDK_14.2.0/
+
+# Build Artifacts and Temporary Files
+build/
+dist/
+*.tmp
+*.log
+
+# OS-Specific Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Debug and Temporary Files
+*.jlink.user
+*.emProject.user
+debug/
