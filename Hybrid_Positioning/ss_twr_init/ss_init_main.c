@@ -1,283 +1,234 @@
+#include "sdk_config.h"
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "FreeRTOS.h"
 #include "task.h"
 #include "deca_device_api.h"
 #include "deca_regs.h"
-#include "port_platform.h"        
-#include "hybrid_scalable.h"
+#include "port_platform.h"
+#include "ble_beacon.h"
+#include "utils.h"
+#include "anchor_calib.h"
 
-#define APP_NAME "SS TWR INIT v1.3"
-#define RNG_DELAY_MS 100
-#define POLL_MSG_DEST_ID_IDX  10
+/* ---------------------------------------------------------------
+   MAX_ANCHORS = số anchor THỰC TẾ trong hệ thống.
+   [FIX 4] Phải khớp với số mạch anchor bạn đã nạp firmware:
+     - 3 anchor  (NODE_ID 2, 3, 4) → MAX_ANCHORS = 3
+     - 4 anchor  (NODE_ID 2, 3, 4, 5) → MAX_ANCHORS = 4
+   Nếu để MAX_ANCHORS = 4 nhưng chỉ có 3 anchor thực tế, tag sẽ
+   poll 1 anchor không tồn tại → luôn có 1 timeout/cycle.
+   --------------------------------------------------------------- */
+#define MAX_ANCHORS 3   /* <<< SỬA CHỖ NÀY khớp với số anchor thực tế */
 
-static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0xFF, 0, 0};
-static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+/* [FIX 5] Thời gian tag chờ trước khi bắt đầu poll.
+   Anchor tự calibrate mất: CALIB_SLOT_MS * (N-1) + TWR time
+   Với CALIB_SLOT_MS=5000, 3 anchor: anchor cuối cần ~10s + vài giây TWR.
+   Tag chờ 12s = an toàn cho tất cả anchor calibrate xong.            */
+#define TAG_STARTUP_DELAY_MS   15000u  /* 15s chờ anchor calib */
 
-#define ALL_MSG_COMMON_LEN 10
-#define ALL_MSG_SN_IDX 2
-#define RESP_MSG_POLL_RX_TS_IDX 10
-#define RESP_MSG_RESP_TX_TS_IDX 14
-#define RESP_MSG_TS_LEN 4
+#define TAG_ID         1
+#define SPEED_OF_LIGHT 299702547.0
+#define FREQ_OFFSET_MULTIPLIER         (998.4e6 / 2.0 / 1024.0 / 131072.0)
+#define HERTZ_TO_PPM_MULTIPLIER_CHAN_5 (-1.0e6 / 6489.6e6)
 
-static uint8 frame_seq_nb = 0;
+/* Background calibrate offset khoảng cách */
+#define CALIB_SAMPLES       20
+#define CALIB_TRUE_DISTANCE 1.0f
 
-#define RX_BUF_LEN 20
-static uint8 rx_buffer[RX_BUF_LEN];
+static int   calib_count[MAX_ANCHORS]   = {0};
+static float calib_sum[MAX_ANCHORS]     = {0};
+static float anchor_offset[MAX_ANCHORS] = {0};
+static bool  is_calibrated[MAX_ANCHORS] = {false};
 
-static uint32 status_reg = 0;
+static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0, 0};
+static uint8 rx_buffer[32];
 
-#define UUS_TO_DWT_TIME 65536
-#define SPEED_OF_LIGHT 299702547
-
-static double tof;
-static double distance;
-
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts);
-
-static volatile int tx_count = 0;
-static volatile int rx_count = 0;
-
-#define MAX_ANCHORS 8
+static vec2 g_tag_pos_est = {0.0, 0.0};
 
 typedef struct {
-    double toa;       
-    double distance;  
-    int valid;
-} AnchorMeas;
+    float    x;
+    float    y;
+    float    dist;
+    uint32_t last_update_tick;
+    bool     is_valid;
+    bool     pos_known;
+} anchor_data_t;
 
-static AnchorMeas meas[MAX_ANCHORS];
-extern vec2 anc[];
-static double phi[N_ANCHORS - 1];
-extern vec2 pos_est;
+static anchor_data_t anchors_info[MAX_ANCHORS];
 
-// ===== THÊM HÀM RESET DW1000 =====
-static void reset_dw1000_state(void)
-{
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_TX | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+void reset_uwb_state(void) {
+    dwt_forcetrxoff();
+    dwt_setrxtimeout(0);
     dwt_rxreset();
-    dwt_setrxtimeout(0);  // Clear timeout
+    dwt_write32bitreg(SYS_STATUS_ID, 0xFFFFFFFF);
 }
 
-int ss_init_run(int anchor_id)
-{
-    if (anchor_id < 0 || anchor_id >= MAX_ANCHORS) return 0;
+bool calculate_tag_position(float *out_x, float *out_y) {
+    vec2   valid_anchors[MAX_ANCHORS];
+    double valid_distances[MAX_ANCHORS];
+    int    count = 0;
 
-
-    // ===== 1. RESET TRẠNG THÁI TRƯỚC KHI GỬI =====
-    reset_dw1000_state();
-    vTaskDelay(5);  // Cho ổn định
-
-    // ===== 2. GỬI POLL =====
-    tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-    tx_poll_msg[POLL_MSG_DEST_ID_IDX] = (uint8)anchor_id;
-    
-    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);  
-    dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
-    dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);
-
-    //printf("[Tag->A%d] → POLL (seq %d)\r\n", anchor_id, frame_seq_nb);
-    
-    int ret = dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-    if (ret != DWT_SUCCESS) {
-        //printf("[Tag->A%d]  TX FAILED\r\n", anchor_id);
-        reset_dw1000_state();
-        return 0;
-    }
-    
-    tx_count++;
-    dwt_setrxtimeout(2500); 
-    
-    uint32 wait_start = xTaskGetTickCount();
-    uint32 max_wait = pdMS_TO_TICKS(50);  // Tối đa 50ms
-    
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-             (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-    {
-        if ((xTaskGetTickCount() - wait_start) > max_wait) {
-            //printf("[Tag->A%d]  SW TIMEOUT\r\n", anchor_id);
-            reset_dw1000_state();
-            return 0;
-        }
-        vTaskDelay(1);
-    }
-
-    frame_seq_nb++;
-
-    // ===== 4. XỬ LÝ KẾT QUẢ =====
-    if (status_reg & SYS_STATUS_RXFCG)
-    {
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
-
-        int frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-        
-        if (frame_len <= RX_BUF_LEN) {
-            dwt_readrxdata(rx_buffer, frame_len, 0);
-        } else {
-            //printf("[Tag->A%d]  Frame too long (%d)\r\n", anchor_id, frame_len);
-            reset_dw1000_state();
-            return 0;
-        }
-
-        rx_buffer[ALL_MSG_SN_IDX] = 0;
-
-        if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
-        {
-            //printf("[Tag->A%d]  RESP OK\r\n", anchor_id);
-
-            // ===== TÍNH TOF & DISTANCE =====
-            uint32 poll_tx_ts = dwt_readtxtimestamplo32();
-            uint32 resp_rx_ts = dwt_readrxtimestamplo32();
-            uint32 poll_rx_ts, resp_tx_ts;
-            resp_msg_get_ts(&rx_buffer[RESP_MSG_POLL_RX_TS_IDX], &poll_rx_ts);
-            resp_msg_get_ts(&rx_buffer[RESP_MSG_RESP_TX_TS_IDX], &resp_tx_ts);
-
-            float clockOffsetRatio = dwt_readcarrierintegrator() *
-                (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6);
-            int32 rtd_init = resp_rx_ts - poll_tx_ts;
-            int32 rtd_resp = resp_tx_ts - poll_rx_ts;
-
-            tof = ((rtd_init - rtd_resp * (1.0f - clockOffsetRatio)) / 2.0f) * DWT_TIME_UNITS;
-            distance = tof * SPEED_OF_LIGHT;
-
-            meas[anchor_id].toa = tof;
-            meas[anchor_id].distance = distance;
-            meas[anchor_id].valid = 1;
-            
-            printf("[Tag->A%d]  Dist = %.2f m\r\n", anchor_id, distance);
-            
-            reset_dw1000_state();  // Clean cho lần sau
-            return 1;
-        }
-        else
-        {
-            printf("[Tag->A%d]  Wrong RESP header\r\n", anchor_id);
+    uint32_t now = xTaskGetTickCount();
+    for (int i = 0; i < MAX_ANCHORS; i++) {
+        bool fresh = (now - anchors_info[i].last_update_tick < pdMS_TO_TICKS(2000));
+        if (anchors_info[i].is_valid && anchors_info[i].pos_known && fresh) {
+            valid_anchors[count].x  = (double)anchors_info[i].x;
+            valid_anchors[count].y  = (double)anchors_info[i].y;
+            valid_distances[count]  = (double)anchors_info[i].dist;
+            count++;
         }
     }
-    else
-    {
-        //printf("[Tag->A%d]  RX FAIL (timeout/error)\r\n", anchor_id);
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
-        dwt_rxreset();
+
+    if (count < 3) {
+        printf("[DBG] valid anchors: %d/3 needed\r\n", count);
+        return false;
     }
 
-    meas[anchor_id].valid = 0;
-    reset_dw1000_state();
-    return 0;
+    int ok = tof_2d_localize(valid_anchors, count, valid_distances, &g_tag_pos_est);
+    if (ok > 0) {
+        *out_x = (float)g_tag_pos_est.x;
+        *out_y = (float)g_tag_pos_est.y;
+        return true;
+    }
+    return false;
 }
 
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
-{
-    int i;
-    *ts = 0;
-    for (i = 0; i < RESP_MSG_TS_LEN; i++)
-    {
-        *ts += ts_field[i] << (i * 8);
+void ss_initiator_task_function(void *pvParameter) {
+    ble_raw_beacon_init(TAG_ID);
+
+    printf("[TAG] Waiting %ds for anchors...\r\n", TAG_STARTUP_DELAY_MS / 1000);
+    vTaskDelay(pdMS_TO_TICKS(TAG_STARTUP_DELAY_MS));
+    printf("[TAG] Starting UWB polling.\r\n\n");
+
+
+    for (int i = 0; i < MAX_ANCHORS; i++) {
+        anchors_info[i].is_valid  = false;
+        anchors_info[i].pos_known = false;
+        anchors_info[i].last_update_tick = 0;
     }
-}
 
-void ss_initiator_task_function(void *pvParameter)
-{
-    UNUSED_PARAMETER(pvParameter);
-    dwt_setleds(DWT_LEDS_ENABLE);
+    static uint8_t tag_seq = 0;
 
-    double t0, ti[N_ANCHORS-1], d1 = -1, d2 = -1;
-    int a1 = TOF_A1, a2 = TOF_A2;
+    while (1) {
 
-    printf("\n[Tag]  INITIATOR TASK STARTED \r\n");
-    printf("[Tag] Will measure %d anchors continuously\r\n\n", N_ANCHORS);
+        /* === 1. ĐO KHOẢNG CÁCH ĐẾN TỪNG ANCHOR === */
+        for (int a = 0; a < MAX_ANCHORS; a++) {
+            reset_uwb_state();
+            vTaskDelay(pdMS_TO_TICKS(1000));  /* 1s giữa mỗi anchor — debug mode */
 
-    while (1)
-    {
-        //printf("    [CYCLE] Measuring %d Anchors\n", N_ANCHORS);
+            /* [FIX 4] Poll đúng NODE_ID của anchor: ANCHOR_REF_ID + index.
+               Ví dụ: a=0 → ID=2, a=1 → ID=3, a=2 → ID=4.
+               Đảm bảo không poll vượt quá số anchor thực tế.          */
+            uint8_t target_anchor_id = (uint8_t)(ANCHOR_REF_ID + a);
+            tx_poll_msg[10] = target_anchor_id;
+            tx_poll_msg[2]++;
 
-        int success_count = 0;
+            dwt_setrxtimeout(20000);  /* 20ms — đủ cho anchor xử lý + DELAYED/IMMEDIATE TX */
 
-        // ===== ĐO TUẦN TỰ TỪNG ANCHOR =====
-        for (int i = 0; i < N_ANCHORS; i++)
-        {
-            //printf("\n--- [%d/%d] Anchor %d ---\n", i+1, N_ANCHORS, i);
-            
-            if (ss_init_run(i)) {
-                success_count++;
+            dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
+            dwt_writetxfctrl(sizeof(tx_poll_msg), 0, 1);
+
+            if (dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED) != DWT_SUCCESS) {
+                printf("[DBG] A%d: TX FAIL\r\n", target_anchor_id);
+                continue;
             }
-            
-            // ===== DELAY GIỮA CÁC LẦN GỬI (QUAN TRỌNG!) =====
-            vTaskDelay(pdMS_TO_TICKS(1000));  // 150ms giữa mỗi anchor
+
+            /* Chờ RX event */
+            while (!((dwt_read32bitreg(SYS_STATUS_ID)) &
+                     (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
+
+            uint32_t st = dwt_read32bitreg(SYS_STATUS_ID);
+
+            if (!(st & SYS_STATUS_RXFCG)) {
+                if (st & SYS_STATUS_ALL_RX_TO)
+                    printf("[DBG] A%d: TIMEOUT\r\n", target_anchor_id);
+                else
+                    printf("[DBG] A%d: RX ERR 0x%08X\r\n", target_anchor_id, (unsigned)st);
+                continue;
+            }
+
+            /* Nhận được gói response */
+            dwt_readrxdata(rx_buffer, 30, 0);
+
+            if (rx_buffer[9] != 0xE1) {
+                printf("[DBG] A%d: wrong func code 0x%02X\r\n", target_anchor_id, rx_buffer[9]);
+                continue;
+            }
+
+            /* Đọc timestamps 40-bit đầy đủ để tránh wrap-around */
+            uint8  tx_ts_raw[5], rx_ts_raw[5];
+            uint64 t_tx = 0, t_rx = 0;
+            dwt_readtxtimestamp(tx_ts_raw);
+            dwt_readrxtimestamp(rx_ts_raw);
+            for (int b = 4; b >= 0; b--) {
+                t_tx = (t_tx << 8) | tx_ts_raw[b];
+                t_rx = (t_rx << 8) | rx_ts_raw[b];
+            }
+
+            uint32 t_round_t = (uint32)(t_tx & 0xFFFFFFFFUL);
+            uint32 t_round_r = (uint32)(t_rx & 0xFFFFFFFFUL);
+            uint32 t_reply_r = *(uint32*)&rx_buffer[10];  /* T1: poll rx  */
+            uint32 t_reply_t = *(uint32*)&rx_buffer[14];  /* T2: resp tx  */
+
+            int32 rtd_init = (int32)(t_round_r - t_round_t);
+            int32 rtd_resp = (int32)(t_reply_t - t_reply_r);
+
+            float cor = (float)(dwt_readcarrierintegrator() *
+                        (FREQ_OFFSET_MULTIPLIER * HERTZ_TO_PPM_MULTIPLIER_CHAN_5 / 1.0e6));
+            double tof = ((double)rtd_init - (double)rtd_resp * (1.0 - cor)) / 2.0;
+            float raw_dist = (float)(tof * DWT_TIME_UNITS * SPEED_OF_LIGHT);
+
+            /* Đọc tọa độ anchor từ gói UWB */
+            float anc_x, anc_y;
+            memcpy(&anc_x, &rx_buffer[18], sizeof(float));
+            memcpy(&anc_y, &rx_buffer[22], sizeof(float));
+
+            anchors_info[a].x         = anc_x;
+            anchors_info[a].y         = anc_y;
+            anchors_info[a].pos_known = true;
+
+            if (raw_dist > 0.05f && raw_dist < 100.0f) {
+                /* Background offset calibration */
+                if (!is_calibrated[a]) {
+                    calib_sum[a]   += raw_dist;
+                    calib_count[a]++;
+                    if (calib_count[a] == CALIB_SAMPLES) {
+                        anchor_offset[a] = calib_sum[a] / CALIB_SAMPLES - CALIB_TRUE_DISTANCE;
+                        is_calibrated[a] = true;
+                        printf("[CAL] A%d offset=%.3fm\r\n", a, anchor_offset[a]);
+                    }
+                }
+
+                float dist = raw_dist - anchor_offset[a];
+                if (dist <= 0.0f) dist = 0.01f;
+
+                printf("[TOF] A%d(id=%d) %.2fm raw=%.2fm pos=(%.2f,%.2f)\r\n",
+                       a, target_anchor_id, dist, raw_dist, anc_x, anc_y);
+
+                anchors_info[a].dist             = dist;
+                anchors_info[a].last_update_tick = xTaskGetTickCount();
+                anchors_info[a].is_valid         = true;
+            } else {
+                printf("[DBG] A%d: dist out of range %.2fm\r\n", target_anchor_id, raw_dist);
+            }
         }
 
-        printf(" Success: %d/%d anchors\n", success_count, N_ANCHORS);
+        /* === 2. TÍNH TỌA ĐỘ VÀ GỬI BLE === */
+        float tag_x = 0.0f, tag_y = 0.0f;
 
-        // ===== TÍNH TOÁN VỊ TRÍ NẾU ĐỦ DỮ LIỆU =====
-        //if (meas[0].valid && meas[1].valid && meas[2].valid && meas[3].valid)
-        //{
-        //    t0 = meas[0].toa;
-        //    double d0 = meas[0].distance;
+        if (calculate_tag_position(&tag_x, &tag_y)) {
+            float d0 = anchors_info[0].is_valid ? anchors_info[0].dist : 0.0f;
+            float d1 = anchors_info[1].is_valid ? anchors_info[1].dist : 0.0f;
+            float d2 = (MAX_ANCHORS > 2 && anchors_info[2].is_valid) ? anchors_info[2].dist : 0.0f;
 
-        //    printf("\n Calculating clock offsets...\n");
-        //    for (int i = 1; i < N_ANCHORS; i++)
-        //    {
-        //        double ti_val = meas[i].toa;
-        //        double di = meas[i].distance;
-        //        phi[i-1] = (ti_val - t0) - (di - d0) / C0;
-        //        ti[i-1] = meas[i].toa;
-        //        printf("   phi[%d] = %+.3e s\n", i-1, phi[i-1]);
-        //    }
+            printf("{\"id\":%d,\"x\":%.2f,\"y\":%.2f,\"d\":[%.2f,%.2f,%.2f]}\r\n",
+                   TAG_ID, tag_x, tag_y, d0, d1, d2);
 
-        //    // Gán distance cho hybrid
-        //    if (a1 >= 0 && a1 < N_ANCHORS) d1 = meas[a1].distance;
-        //    if (a2 >= 0 && a2 < N_ANCHORS) d2 = meas[a2].distance;
+            /* [DEBUG] BLE send tạm tắt để tránh block vòng lặp poll.
+               Bật lại sau khi xác nhận TOF hoạt động đúng. */
+        }
 
-        //    int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est);
-
-        //    printf("\n POSITION: (%.3f, %.3f) m | GN: %d iter\n", 
-        //           pos_est.x, pos_est.y, it);
-        //}
-        //else
-        //{
-        //    printf("\n Not enough valid measurements for positioning\n");
-        //}
-        int ok = 1;
-for (int i = 0; i < 4; i++)
-    if (!meas[i].valid) ok = 0;
-
-if (!ok) {
-    printf("\n Not enough valid measurements\n");
-    goto cycle_end;
-}
-
-t0 = meas[0].toa;
-double d0 = meas[0].distance;
-
-printf("\n Calculating clock offsets...\n");
-for (int i = 1; i < 4; i++)
-{
-    double ti_val = meas[i].toa;
-    double di = meas[i].distance;
-    phi[i-1] = (ti_val - t0) - (di - d0) / C0;
-    ti[i-1] = meas[i].toa;
-    printf("   phi[%d] = %+.3e s\n", i-1, phi[i-1]);
-}
-
-if (a1 >= 0 && a1 < N_ANCHORS) d1 = meas[a1].distance;
-if (a2 >= 0 && a2 < N_ANCHORS) d2 = meas[a2].distance;
-
-TickType_t t_start = xTaskGetTickCount();
-int it = hybrid_localize(anc, N_ANCHORS, t0, ti, phi, d1, d2, a1, a2, &pos_est);
-
-// tránh GN treo
-if ((xTaskGetTickCount() - t_start) > pdMS_TO_TICKS(50)) {
-    printf("GN too slow → skip\n");
-    goto cycle_end;
-}
-
-printf("\n POSITION: (%.3f, %.3f) m | GN: %d iter\n", 
-        pos_est.x, pos_est.y, it);
-
-cycle_end:
-
-
-        // ===== DELAY GIỮA CÁC CHU KỲ ĐO =====
-        //vTaskDelay(pdMS_TO_TICKS(100));  // 500ms giữa các cycle
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 }

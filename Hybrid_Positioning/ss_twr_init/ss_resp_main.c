@@ -6,195 +6,162 @@
 #include "deca_device_api.h"
 #include "deca_regs.h"
 #include "port_platform.h"
+#include "ble_beacon.h"
+#include "anchor_calib.h"
 
-#ifndef NODE_ID
-#define NODE_ID 3  
-#endif
-#define MY_ANCHOR_ID  NODE_ID
+#define MY_ANCHOR_ID NODE_ID
 
-#define POLL_MSG_DEST_ID_IDX  10
-#define RNG_DELAY_MS 5  // Anchor phản hồi nhanh
-#define RX_TIMEOUT_UUS 5000
+/* Tọa độ sẽ được điền bởi anchor_self_calibrate() */
+static float my_pos_x = 0.0f;
+static float my_pos_y = 0.0f;
 
-static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0xFF, 0, 0};
-static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+/* ---------------------------------------------------------------
+   Gói phản hồi UWB (27 byte)
+     [0-9]   Header
+     [10-13] T1: Poll RX timestamp
+     [14-17] T2: Resp TX timestamp  (pre-computed từ DELAYED time)
+     [18-21] Anchor pos X (float)
+     [22-25] Anchor pos Y (float)
+     [26]    Anchor ID
+   --------------------------------------------------------------- */
+static uint8 tx_resp_msg[27] = {
+    0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1,
+    0,0,0,0,  /* T1 */
+    0,0,0,0,  /* T2 */
+    0,0,0,0,  /* X  */
+    0,0,0,0,  /* Y  */
+    0         /* ID */
+};
+/* FCS 2 byte được DW1000 TỰ APPEND khi TX, KHÔNG đưa vào buffer.
+   dwt_writetxfctrl(27, ...) báo cho chip gửi 27 byte user data
+   + 2 byte FCS tỰ động ⇒ trên không là 29 byte. Tag nhận 27 byte. */
+/* [FIX 1] Tăng delay lên 3000µs (từ 1500µs).
+   Lý do: sau khi nhận poll, code phải đọc data + chuẩn bị response.
+   1500µs đôi khi không đủ khi FreeRTOS có task switch. 3000µs an toàn hơn
+   và vẫn nằm trong RX timeout 5ms của tag. */
+#define POLL_RX_TO_RESP_TX_DLY_UUS  3000
+#define UUS_TO_DWT_TIME             65536
+#define TX_ANT_DLY                  16436
 
-#define ALL_MSG_COMMON_LEN 10
-#define ALL_MSG_SN_IDX 2
-#define RESP_MSG_POLL_RX_TS_IDX 10
-#define RESP_MSG_RESP_TX_TS_IDX 14
-#define RESP_MSG_TS_LEN 4
+static uint8 rx_buffer[64];
 
-static uint8 frame_seq_nb = 0;
+static uint64 get_rx_timestamp_u64(void) {
+    uint8 ts[5]; uint64 t = 0;
+    dwt_readrxtimestamp(ts);
+    for (int i = 4; i >= 0; i--) { t <<= 8; t |= ts[i]; }
+    return t;
+}
 
-#define RX_BUF_LEN 24
-static uint8 rx_buffer[RX_BUF_LEN];
+static void resp_msg_set_ts(uint8 *field, uint64 ts) {
+    for (int i = 0; i < 4; i++) field[i] = (ts >> (i * 8)) & 0xFF;
+}
 
-static uint32 status_reg = 0;
+void ss_responder_task_function(void *pvParameter) {
 
-#define UUS_TO_DWT_TIME 65536
-#define POLL_RX_TO_RESP_TX_DLY_UUS 2500
-#define RESP_TX_TO_FINAL_RX_DLY_UUS 500
-
-typedef unsigned long long uint64;
-static uint64 poll_rx_ts;
-static uint64 resp_tx_ts;
-
-static uint64 get_rx_timestamp_u64(void);
-static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts);
-static uint64 final_rx_ts = 0;
-// ===== THỐNG KÊ =====
-static uint32 total_received = 0;
-static uint32 for_me = 0;
-static uint32 replied = 0;
-static uint32 ignored = 0;
-
-int ss_resp_run(void)
-{
-    // ===== 1. BẬT RX (LUÔN LẮNG NGHE) =====
-    dwt_rxenable(DWT_START_RX_IMMEDIATE);
-
-    // ===== 2. CHỜ FRAME ĐẾN =====
-    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) &
-             (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)))
-    {
-        vTaskDelay(1);  // Yield CPU
+    /* === BƯỚC 1: SELF-CALIBRATION === */
+    bool calib_ok = anchor_self_calibrate(MY_ANCHOR_ID, &my_pos_x, &my_pos_y);
+    if (!calib_ok) {
+        printf("[A%d] WARNING: calibration failed, using (0,0)\r\n", MY_ANCHOR_ID);
     }
 
-    uint32 frame_len = 0;
-    int rx_success = 0;
+    /* Reset DW1000 hoàn toàn sau calibration */
+    dwt_forcetrxoff();
+    dwt_rxreset();
+    dwt_write32bitreg(SYS_STATUS_ID, 0xFFFFFFFF);
+    vTaskDelay(pdMS_TO_TICKS(10));
 
-    // ===== 3. ĐỌC FRAME =====
-    if (status_reg & SYS_STATUS_RXFCG)
-    {
-        total_received++;
-        
-        frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
+    /* Nhúng tọa độ và ID vào template một lần duy nhất */
+    memcpy(&tx_resp_msg[18], &my_pos_x, sizeof(float));
+    memcpy(&tx_resp_msg[22], &my_pos_y, sizeof(float));
+    tx_resp_msg[26] = (uint8)MY_ANCHOR_ID;
 
-        if (frame_len <= RX_BUF_LEN)
-        {
-            dwt_readrxdata(rx_buffer, frame_len, 0);
-            rx_success = 1;
-        }
-    }
+    /* Khởi tạo BLE */
+    ble_raw_beacon_init(MY_ANCHOR_ID);
 
-    // ===== 4. CLEAR FLAGS =====
-    dwt_write32bitreg(SYS_STATUS_ID,
-                      SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR);
+    printf("[A%d] READY. pos=(%.3f, %.3f)\r\n",
+           MY_ANCHOR_ID, my_pos_x, my_pos_y);
 
-    // ===== 5. XỬ LÝ FRAME NẾU NHẬN THÀNH CÔNG =====
-    if (rx_success)
-    {
-        uint8 dest_id = rx_buffer[POLL_MSG_DEST_ID_IDX];
+    TickType_t last_ble_tx       = 0;
+    TickType_t last_heartbeat_tx = 0;
+    uint8_t    anchor_seq        = 0;
 
-        printf("[A%d] RX: dest=%d | len=%lu | ", MY_ANCHOR_ID, dest_id, frame_len);
-        for (int i=0; i<8 && i<frame_len; i++) printf("%02X ", rx_buffer[i]);
-        printf("\r\n");
+    /* === BƯỚC 2: VÒNG LẶP CHÍNH === */
+    uint32_t rx_count = 0;
+    while (1) {
+        rx_count++;
+        dwt_setrxtimeout(65000);
+        dwt_write32bitreg(SYS_STATUS_ID, 0xFFFFFFFF);  /* clear all */
+        dwt_rxenable(DWT_START_RX_IMMEDIATE);
 
-        // ===== KIỂM TRA XEM CÓ PHẢI CHO MÌNH KHÔNG =====
-        if (dest_id != MY_ANCHOR_ID)
-        {
-            ignored++;
-            printf("[A%d] ⊘ SKIP (not for me) [Stats: rx=%lu, for_me=%lu, replied=%lu, ignored=%lu]\r\n",
-                   MY_ANCHOR_ID, total_received, for_me, replied, ignored);
-            return 1;  // Không phản hồi, quay lại lắng nghe
-        }
+        while (!(dwt_read32bitreg(SYS_STATUS_ID) &
+                 (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_TO | SYS_STATUS_ALL_RX_ERR)));
 
-        for_me++;
+        uint32 status = dwt_read32bitreg(SYS_STATUS_ID);
 
-        // ===== KIỂM TRA ĐÚNG POLL MESSAGE =====
-        uint8 rx_buffer_check[RX_BUF_LEN];
-        memcpy(rx_buffer_check, rx_buffer, frame_len);
-        rx_buffer_check[ALL_MSG_SN_IDX] = 0;
-        rx_buffer_check[POLL_MSG_DEST_ID_IDX] = 0xFF;  // So sánh với mẫu
+        if (status & SYS_STATUS_RXFCG) {
+            uint32 flen = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+            if (flen <= sizeof(rx_buffer))
+                dwt_readrxdata(rx_buffer, flen, 0);
 
-        
+            if (rx_buffer[9] == 0xE0 && rx_buffer[10] == (uint8)MY_ANCHOR_ID) {
 
-        if (memcmp(rx_buffer_check, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
-        {
-            printf("[A%d] ✅ VALID POLL for me!\r\n", MY_ANCHOR_ID);
+                /* === TIMING-CRITICAL: không printf trong đoạn này === */
+                uint64 poll_rx_ts = get_rx_timestamp_u64();
 
-            // ===== TÍNH TIMESTAMP VÀ GỬI RESP =====
-            poll_rx_ts = get_rx_timestamp_u64();
+                uint32 resp_tx_time = (uint32)(
+                    (poll_rx_ts + (uint64)POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME) >> 8
+                );
+                dwt_setdelayedtrxtime(resp_tx_time);
 
-            uint32 resp_tx_time = (poll_rx_ts +
-                    (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
+                uint64 resp_tx_ts = ((uint64)(resp_tx_time & 0xFFFFFFFEUL) << 8) + TX_ANT_DLY;
 
-            dwt_setdelayedtrxtime(resp_tx_time);
-            resp_tx_ts = (((uint64)(resp_tx_time & 0xFFFFFFFEUL)) << 8) + TX_ANT_DLY;
+                resp_msg_set_ts(&tx_resp_msg[10], poll_rx_ts);
+                resp_msg_set_ts(&tx_resp_msg[14], resp_tx_ts);
 
-            resp_msg_set_ts(&tx_resp_msg[RESP_MSG_POLL_RX_TS_IDX], poll_rx_ts);
-            resp_msg_set_ts(&tx_resp_msg[RESP_MSG_RESP_TX_TS_IDX], resp_tx_ts);
-            tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+                dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
+                dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
 
-            dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
-            dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
+                int tx_ret = dwt_starttx(DWT_START_TX_DELAYED);
+                if (tx_ret == DWT_SUCCESS) {
+                    while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+                    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+                    /* printf SAU TX -- không ảnh hưởng timing */
+                    printf("[A%d] responded (delayed) rx#%lu\r\n",
+                           MY_ANCHOR_ID, (unsigned long)rx_count);
+                } else {
+                    /* Fallback IMMEDIATE khi DELAYED "time in past" */
+                    dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
+                    dwt_writetxfctrl(sizeof(tx_resp_msg), 0, 1);
+                    if (dwt_starttx(DWT_START_TX_IMMEDIATE) == DWT_SUCCESS) {
+                        while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS));
+                        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+                        printf("[A%d] responded (immediate fallback) rx#%lu\r\n",
+                               MY_ANCHOR_ID, (unsigned long)rx_count);
+                    } else {
+                        printf("[A%d] TX FAIL rx#%lu\r\n",
+                               MY_ANCHOR_ID, (unsigned long)rx_count);
+                        dwt_rxreset();
+                    }
+                }
 
-            printf("[A%d] → Sending RESP...\r\n", MY_ANCHOR_ID);
-            int ret = dwt_starttx(DWT_START_TX_DELAYED);
-
-            if (ret == DWT_SUCCESS)
-            {
-                while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS)) {}
-                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-                frame_seq_nb++;
-                replied++;
-                printf("[A%d] ✅ RESP sent OK [Stats: rx=%lu, for_me=%lu, replied=%lu, ignored=%lu]\r\n",
-                       MY_ANCHOR_ID, total_received, for_me, replied, ignored);
+            } else {
+                /* Frame không dành cho anchor này */
+                printf("[A%d] ignore: b9=0x%02X b10=%d myID=%d\r\n",
+                       MY_ANCHOR_ID, rx_buffer[9], rx_buffer[10], (uint8)MY_ANCHOR_ID);
+                dwt_rxreset();
             }
-            else
-            {
-                printf("[A%d] ❌ RESP send FAILED (late)\r\n", MY_ANCHOR_ID);
-            }
+
+        } else {
+            dwt_rxreset();
         }
-        else
-        {
-            printf("[A%d] ⚠ Wrong POLL format\r\n", MY_ANCHOR_ID);
+
+        /* Heartbeat / BLE section đã tạm tắt để debug.
+           Chỉ in alive mỗi 10 giây qua timer đơn giản. */
+        TickType_t now2 = xTaskGetTickCount();
+        if (now2 - last_heartbeat_tx > pdMS_TO_TICKS(10000)) {
+            printf("[A%d] --- heartbeat, rx_count=%lu ---\r\n",
+                   MY_ANCHOR_ID, (unsigned long)rx_count);
+            last_heartbeat_tx = now2;
         }
-    }
-    else
-    {
-        // Timeout hoặc lỗi RX
-        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
-        dwt_rxreset();
-    }
-
-    return 1;
-}
-
-static uint64 get_rx_timestamp_u64(void)
-{
-    uint8 ts_tab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readrxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--)
-    {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
-}
-
-static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts)
-{
-    int i;
-    for (i = 0; i < RESP_MSG_TS_LEN; i++)
-    {
-        ts_field[i] = (ts >> (i * 8)) & 0xFF;
-    }
-}
-
-void ss_responder_task_function(void *pvParameter)
-{
-    UNUSED_PARAMETER(pvParameter);
-    dwt_setleds(DWT_LEDS_ENABLE);
-    
-    printf("[A%d]  ANCHOR RESPONDER STARTED\r\n", MY_ANCHOR_ID);
-    
-    while (true)
-    {
-        ss_resp_run();
-        vTaskDelay(RNG_DELAY_MS);  // Delay ngắn để không nghẽn CPU
     }
 }

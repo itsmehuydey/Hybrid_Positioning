@@ -23,26 +23,34 @@
 #include "deca_regs.h"
 #include "deca_device_api.h"
 #include "uart.h"
-#include "hybrid_scalable.h"
+#include "utils.h"
+#include "ble_beacon.h"
+#include "ble_scanner.h"
+#include "ble_hybrid.h"
+#include "anchor_calib.h"  /* ANCHOR_REF_ID, quy ước NODE_ID */
 //#define SIMULATION_MODE
 #include "simulation.c"
 
-#ifndef NODE_ID
-#define NODE_ID 1
-#warning "NODE_ID not defined, defaulting to 1 (Tag)"
-#endif
+/* ---------------------------------------------------------
+   NODE_ID – Thay số này khi nạp firmware cho từng mạch:
+     1 → Tag (Initiator)
+     2 → Anchor gốc (Reference) – cố định tại (0, 0)
+     3,4,5… → Anchor slave – tự tính tọa độ khi khởi động
+   --------------------------------------------------------- */
+/* NODE_ID được định nghĩa trong anchor_calib.h (include ở trên).
+   Sửa ở đó để áp dụng cho toàn bộ project. */
 
 
 // Tọa độ các anchor (chỉ dùng cho Tag)
 #if NODE_ID == 1
-vec2 anc[N_ANCHORS] = {
-    {0.0, 0.0},   // A0: góc trái-trước
-    {2.0, 0.0},   // A1: góc phải-trước
-    {2.0, 1.0},   // A2: góc phải-sau
-    {0.0, 1.0}    // A3: góc trái-sau
-};
+//vec3 anc[N_ANCHORS] = {
+//    {0.0, 0.0, 2.5},  
+//    {2.0, 0.0, 2.5},
+//    {2.0, 1.0, 2.5},
+//    {0.0, 1.0, 2.5}
+//};
 
-vec2 pos_est = {0, 0};
+//vec3 pos_est = {0, 0, 1.0}; 
 #endif
 
 // Cấu hình DW1000
@@ -93,8 +101,10 @@ extern void ss_initiator_task_function(void *pvParameter);
 extern void ss_responder_task_function(void *pvParameter);
 
 
+
 int main(void)
 {
+
     // === Khởi tạo LED ===
     LEDS_CONFIGURE(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
     LEDS_ON(BSP_LED_0_MASK | BSP_LED_1_MASK | BSP_LED_2_MASK);
@@ -105,13 +115,17 @@ int main(void)
     xTimerStart(led_timer_handle, 0);
 
     // === Cấu hình UART ===
-    boUART_Init();
+   // boUART_Init();
+
     printf("\r\n=== UWB Hybrid Localization System ===\r\n");
     printf("Node ID: %d ", NODE_ID);
+
 #if NODE_ID == 1
     printf("(TAG - Initiator)\r\n");
+#elif NODE_ID == ANCHOR_REF_ID
+    printf("(ANCHOR REFERENCE - will be at 0,0)\r\n");
 #else
-    printf("(ANCHOR %d)\r\n", NODE_ID - 2);
+    printf("(ANCHOR SLAVE - will self-calibrate position)\r\n");
 #endif
 
     // === Cấu hình ngắt DW1000 ===
@@ -142,15 +156,17 @@ int main(void)
     }
 #else
 
-    // === Tạo task UWB phù hợp với NODE_ID ===
 #if NODE_ID == 1
-    // Tag: chạy initiator
-    xTaskCreate(ss_initiator_task_function, "UWB_INIT", configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
-    printf("Starting as TAG (Initiator)...\r\n");
+    /* === TAG === */
+    xTaskCreate(ss_initiator_task_function, "UWB_INIT",
+                configMINIMAL_STACK_SIZE + 300, NULL, 3, &uwb_task_handle);
+
 #else
-    // Anchor: chạy responder
-    xTaskCreate(ss_responder_task_function, "UWB_RESP", configMINIMAL_STACK_SIZE + 200, NULL, 3, &uwb_task_handle);
-    printf("Starting as ANCHOR (Responder)...\r\n");
+    /* === ANCHOR (cả reference lẫn slave) ===
+       Stack lớn hơn để chứa cả logic calibrate (calib_rx_buf,
+       known_pos[], known_dist[] được khai báo trong anchor_calib.c) */
+    xTaskCreate(ss_responder_task_function, "UWB_RESP",
+                configMINIMAL_STACK_SIZE + 400, NULL, 3, &uwb_task_handle);
 #endif
 
     // === Bắt đầu FreeRTOS ===
