@@ -28,8 +28,10 @@
 #include "ble_scanner.h"
 #include "ble_hybrid.h"
 #include "anchor_calib.h"  /* ANCHOR_REF_ID, quy ước NODE_ID */
+
+
 //#define SIMULATION_MODE
-#include "simulation.c"
+#include "simulation.h"
 
 /* ---------------------------------------------------------
    NODE_ID – Thay số này khi nạp firmware cho từng mạch:
