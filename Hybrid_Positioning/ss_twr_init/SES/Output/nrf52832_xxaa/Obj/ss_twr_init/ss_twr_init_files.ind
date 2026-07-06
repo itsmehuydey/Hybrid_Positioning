@@ -1,7 +1,7 @@
-"Output/nrf52832_xxaa/Obj/ss_twr_init/anchor_calib.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/ble_beacon.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/ble_hybrid.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/ble_scanner.o"
+"Output/nrf52832_xxaa/Obj/ss_twr_init/uwb_calib.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/main.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/simulation.o"
 "Output/nrf52832_xxaa/Obj/ss_twr_init/ss_init_main.o"

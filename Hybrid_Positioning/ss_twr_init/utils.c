@@ -4,13 +4,14 @@
 
 /* ================= CONFIG ================= */
 #define DET_EPS     1e-6
-#define STEP_LIMIT  0.3
+#define STEP_LIMIT  0.15
 #define MAX_POS     100.0
 
 int tof_2d_localize(const vec2 anc[], int num_anchors,
                     const double distances[],
                     vec2 *pos_est)
 {
+    // Cần ít nhất 3 Anchor để giải hệ 2D chính xác (nếu 2 thì có 2 nghiệm)
     if (num_anchors < 3 || !anc || !distances || !pos_est)
         return -1;
 
@@ -23,16 +24,20 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
         pos_est->y = 0.0;
     }
 
-    double curr_x, curr_y;
+    // Tận dụng vị trí ước lượng cũ làm điểm bắt đầu (Initial guess)
+    double curr_x = pos_est->x;
+    double curr_y = pos_est->y;
 
-    /* ===== Initial guess: anchor gần nhất ===== */
-    int min_i = 0;
-    for (int i = 1; i < num_anchors; i++) {
-        if (distances[i] < distances[min_i])
-            min_i = i;
+    /* ===== Initial guess: anchor gần nhất (Nếu chưa có vị trí cũ hợp lệ) ===== */
+    if (fabs(curr_x) < 1e-3 && fabs(curr_y) < 1e-3) {
+        int min_i = 0;
+        for (int i = 1; i < num_anchors; i++) {
+            if (distances[i] < distances[min_i])
+                min_i = i;
+        }
+        curr_x = anc[min_i].x;
+        curr_y = anc[min_i].y;
     }
-    curr_x = anc[min_i].x;
-    curr_y = anc[min_i].y;
 
     double lambda = 0.1;
     const int max_it = 50;
@@ -43,7 +48,7 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
         double jtf[2] = {0};
         double curr_cost = 0.0;
 
-        /* ===== Build system ===== */
+        /* ===== Build system 2x2 với Trọng số phần dư (IRLS) ===== */
         for (int i = 0; i < num_anchors; i++) {
 
             double dx = curr_x - anc[i].x;
@@ -52,25 +57,33 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
             double r = sqrt(dx*dx + dy*dy);
             if (r < 1e-6) r = 1e-6;
 
+            // Tính phần dư (Residual): r_i = khoảng_cách_lý_thuyết - khoảng_cách_thực_đo
             double res = r - distances[i];
-            curr_cost += res * res;
+            
+            // Tính trọng số w = 1 / (|res| + 0.1) để tự động giảm nhiễu từ các Anchor đo sai
+            double w = 1.0 / (fabs(res) + 0.1); 
+
+            curr_cost += w * res * res; // Hàm chi phí có trọng số
 
             double jx = dx / r;
             double jy = dy / r;
 
-            jtj[0][0] += jx * jx;
-            jtj[0][1] += jx * jy;
-            jtj[1][0] += jy * jx;
-            jtj[1][1] += jy * jy;
+            // Nhân trọng số w vào ma trận J^T * W * J
+            jtj[0][0] += w * jx * jx; 
+            jtj[0][1] += w * jx * jy;
+            jtj[1][0] += w * jy * jx; 
+            jtj[1][1] += w * jy * jy;
 
-            jtf[0] += jx * res;
-            jtf[1] += jy * res;
+            // Nhân trọng số w vào vector J^T * W * res
+            jtf[0] += w * jx * res;
+            jtf[1] += w * jy * res;
         }
 
         /* ===== LM damping ===== */
         jtj[0][0] += lambda;
         jtj[1][1] += lambda;
 
+        /* ===== Determinant 2x2 ===== */
         double det = jtj[0][0]*jtj[1][1] - jtj[0][1]*jtj[1][0];
 
         if (fabs(det) < DET_EPS) {
@@ -78,17 +91,24 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
             continue;
         }
 
-        double dx = (-jtf[0]*jtj[1][1] + jtf[1]*jtj[0][1]) / det;
-        double dy = (-jtf[1]*jtj[0][0] + jtf[0]*jtj[1][0]) / det;
+        /* ===== Inverse 2x2 & Solve ===== */
+        double inv[2][2];
+        inv[0][0] =  jtj[1][1] / det;
+        inv[0][1] = -jtj[0][1] / det;
+        inv[1][0] = -jtj[1][0] / det;
+        inv[1][1] =  jtj[0][0] / det;
+
+        double dx_step = -(inv[0][0]*jtf[0] + inv[0][1]*jtf[1]);
+        double dy_step = -(inv[1][0]*jtf[0] + inv[1][1]*jtf[1]);
 
         /* ===== Clamp step ===== */
-        if (dx > STEP_LIMIT) dx = STEP_LIMIT;
-        if (dx < -STEP_LIMIT) dx = -STEP_LIMIT;
-        if (dy > STEP_LIMIT) dy = STEP_LIMIT;
-        if (dy < -STEP_LIMIT) dy = -STEP_LIMIT;
+        if (dx_step > STEP_LIMIT) dx_step = STEP_LIMIT;
+        if (dx_step < -STEP_LIMIT) dx_step = -STEP_LIMIT;
+        if (dy_step > STEP_LIMIT) dy_step = STEP_LIMIT;
+        if (dy_step < -STEP_LIMIT) dy_step = -STEP_LIMIT;
 
-        double next_x = curr_x + dx;
-        double next_y = curr_y + dy;
+        double next_x = curr_x + dx_step;
+        double next_y = curr_y + dy_step;
 
         /* ===== Guard ===== */
         if (isnan(next_x) || isnan(next_y) ||
@@ -104,8 +124,12 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
             double tx = next_x - anc[i].x;
             double ty = next_y - anc[i].y;
             double tr = sqrt(tx*tx + ty*ty);
+            
             double res = tr - distances[i];
-            next_cost += res * res;
+            
+            // Cập nhật lại trọng số cho vị trí test mới
+            double w = 1.0 / (fabs(res) + 0.1); 
+            next_cost += w * res * res;
         }
 
         /* ===== Accept / Reject ===== */
@@ -116,7 +140,7 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
             lambda *= 0.7;
             if (lambda < 1e-5) lambda = 1e-5;
 
-            if (sqrt(dx*dx + dy*dy) < 1e-4)
+            if (sqrt(dx_step*dx_step + dy_step*dy_step) < 1e-4)
                 break;
         } else {
             lambda *= 2.0;
@@ -129,4 +153,69 @@ int tof_2d_localize(const vec2 anc[], int num_anchors,
     pos_est->y = curr_y;
 
     return 1;
+}
+
+int calculate_anchor_geometry(double d01, double d02, double d03,
+                              double d12, double d13, double d23,
+                              vec2 *a1, vec2 *a2, vec2 *a3)
+{
+    if (d01 <= 0 || d02 <= 0 || d03 <= 0 || d12 <= 0 || d13 <= 0 || d23 <= 0) return 0;
+
+    // 1. Tính A1 (Nằm trên trục X dương)
+    a1->x = d01;
+    a1->y = 0.0;
+
+    // 2. Tính A2 (Nằm trên mặt phẳng XY)
+    // Áp dụng định lý hàm số Cosin cho tam giác A0-A1-A2
+    a2->x = (d02 * d02 + d01 * d01 - d12 * d12) / (2.0 * d01);
+    
+    double y2_sq = d02 * d02 - (a2->x * a2->x);
+    if (y2_sq < 0) y2_sq = 0.0; // Tránh lỗi số học do nhiễu UWB
+    a2->y = sqrt(y2_sq);
+
+    // 3. Tính A3 (Chỉ tính x, y trên mặt phẳng 2D)
+    a3->x = (d03 * d03 + d01 * d01 - d13 * d13) / (2.0 * d01);
+
+    if (a2->y < 1e-6) return 0; // Tránh chia cho 0 nếu A0, A1, A2 thẳng hàng
+
+    a3->y = (d02 * d02 + d03 * d03 - d23 * d23 - 2.0 * a3->x * a2->x) / (2.0 * a2->y);
+
+    return 1;
+}
+
+/* ============================================================
+   Bộ lọc 2D Exponential Moving Average (EMA) cho Tag
+   ============================================================ */
+void ema_2d_init(ema_2d_t *filter, double alpha) {
+    if (!filter) return;
+    filter->x = 0.0;
+    filter->y = 0.0;
+    
+    // Ràng buộc alpha trong khoảng (0, 1]
+    if (alpha <= 0.0) alpha = 0.01;
+    if (alpha > 1.0) alpha = 1.0;
+    
+    filter->alpha = alpha;
+    filter->initialized = 0;
+}
+
+vec2 ema_2d_update(ema_2d_t *filter, vec2 raw_meas) {
+    if (!filter) return raw_meas;
+
+    // Nếu là điểm đầu tiên, gán luôn giá trị đo được làm mốc
+    if (!filter->initialized) {
+        filter->x = raw_meas.x;
+        filter->y = raw_meas.y;
+        filter->initialized = 1;
+    } else {
+        // Công thức EMA: S_t = alpha * Y_t + (1 - alpha) * S_{t-1}
+        filter->x = filter->alpha * raw_meas.x + (1.0 - filter->alpha) * filter->x;
+        filter->y = filter->alpha * raw_meas.y + (1.0 - filter->alpha) * filter->y;
+    }
+
+    vec2 smoothed_pos;
+    smoothed_pos.x = filter->x;
+    smoothed_pos.y = filter->y;
+    
+    return smoothed_pos;
 }

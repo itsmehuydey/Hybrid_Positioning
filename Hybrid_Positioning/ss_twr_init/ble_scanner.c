@@ -48,15 +48,11 @@ void ble_scanner_init(void)
         (RADIO_CRCCNF_SKIPADDR_Skip << RADIO_CRCCNF_SKIPADDR_Pos);
 
     NRF_RADIO->PACKETPTR = (uint32_t)scan_buf;
-    
-    // === THÊM MỚI: Bật tính năng đo RSSI tự động ===
-    NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk; 
-    // ===============================================
+    NRF_RADIO->SHORTS |= RADIO_SHORTS_ADDRESS_RSSISTART_Msk;
 }
 
 int ble_scan_for_config(web_config_t *out_config)
 {
-    // Lấy 2 byte cuối MAC address của mạch nRF52
     uint16_t my_mac16 = (uint16_t)(NRF_FICR->DEVICEADDR[0] & 0xFFFF);
 
     for (uint8_t ch = 0; ch < 3; ch++)
@@ -80,7 +76,6 @@ int ble_scan_for_config(web_config_t *out_config)
 
         NRF_RADIO->TASKS_START = 1;
 
-        // Quét trong 1 khoảng thời gian RẤT NGẮN (~15ms) thay vì chờ đợi lâu
         for (volatile int i = 0; i < 300000; i++)
         {
             if (NRF_RADIO->EVENTS_END)
@@ -97,16 +92,11 @@ int ble_scan_for_config(web_config_t *out_config)
                         uint8_t fl = p[0];
                         if (fl == 0 || fl + 1 > remain) break;
 
-                        // Tìm Manufacturer Data (0xFF) và Nordic CID (0x0059)
                         if (p[1] == 0xFF && p[2] == (TARGET_CID & 0xFF) && p[3] == (TARGET_CID >> 8))
                         {
                             uint8_t payload_len = fl - 3;
-                            
-                            // Kiểm tra kích thước gói cấu hình (5 byte)
                             if (payload_len >= sizeof(web_config_t)) {
                                 web_config_t *received_cfg = (web_config_t*)&p[4];
-
-                                // Kiểm tra Magic Byte 'C' và MAC
                                 if (received_cfg->magic_byte == 'C' && 
                                    (received_cfg->target_mac == my_mac16 || received_cfg->target_mac == 0xFFFF)) 
                                 {
@@ -128,7 +118,6 @@ int ble_scan_for_config(web_config_t *out_config)
     return 0;
 }
 
-// Hàm gốc để không lỗi các chỗ khác
 int ble_scan_packet(uint8_t *out, uint16_t *out_len)
 {
     for (uint8_t ch = 0; ch < 3; ch++)
@@ -212,7 +201,6 @@ int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y)
 
         NRF_RADIO->TASKS_START = 1;
 
-        // Quét ngắn hạn để không block Anchor quá lâu
         for (volatile int i = 0; i < 300000; i++)
         {
             if (NRF_RADIO->EVENTS_END)
@@ -229,12 +217,9 @@ int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y)
                         uint8_t fl = p[0];
                         if (fl == 0 || fl + 1 > remain) break;
 
-                        // Tìm Manufacturer Data (0xFF) và Nordic CID (0x0059)
                         if (p[1] == 0xFF && p[2] == (TARGET_CID & 0xFF) && p[3] == (TARGET_CID >> 8))
                         {
                             uint8_t payload_len = fl - 3;
-
-                            // magic(1) + id(1) + x(4) + y(4) = 10 bytes
                             if (payload_len >= 10) { 
                                 uint8_t magic = p[4];
                                 uint8_t target_id = p[5];
@@ -243,7 +228,7 @@ int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y)
                                     memcpy(out_x, &p[6], 4);
                                     memcpy(out_y, &p[10], 4);
                                     NRF_RADIO->TASKS_DISABLE = 1;
-                                    return 1; // Nhận thành công
+                                    return 1;
                                 }
                             }
                         }
@@ -259,7 +244,6 @@ int ble_scan_for_geometry(uint8_t my_id, float *out_x, float *out_y)
     return 0;
 }
 
-// === THÊM MỚI ===
 int ble_scan_presence_with_rssi(uint8_t *out_id, float *out_x, float *out_y, int8_t *out_rssi)
 {
     for (uint8_t ch = 0; ch < 3; ch++)
@@ -304,15 +288,12 @@ int ble_scan_presence_with_rssi(uint8_t *out_id, float *out_x, float *out_y, int
                             uint8_t payload_len = fl - 3;
                             if (payload_len >= 10) { 
                                 uint8_t magic = p[4];
-                                if (magic == 'P') { // Bắt đúng gói Presence
+                                if (magic == 'P') {
                                     *out_id = p[5];
                                     memcpy(out_x, &p[6], 4);
                                     memcpy(out_y, &p[10], 4);
-                                    
-                                    // ĐỌC RSSI
                                     uint8_t sample = NRF_RADIO->RSSISAMPLE;
-                                    *out_rssi = -(int8_t)sample; 
-
+                                    *out_rssi = -(int8_t)sample;
                                     NRF_RADIO->TASKS_DISABLE = 1;
                                     return 1;
                                 }

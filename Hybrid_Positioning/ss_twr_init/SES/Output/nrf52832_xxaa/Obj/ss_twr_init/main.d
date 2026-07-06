@@ -73,16 +73,14 @@ Output/nrf52832_xxaa/Obj/ss_twr_init/main.o: \
  ../../../nRF5_SDK_14.2.0/components/libraries/experimental_log/nrf_log.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/experimental_section_vars/nrf_section.h \
  ../../../nRF5_SDK_14.2.0/components/libraries/experimental_log/src/nrf_log_internal.h \
- ../../../nRF5_SDK_14.2.0/components/libraries/util/app_error.h \
  ../../../deca_driver/port/port_platform.h \
- ../../../deca_driver/deca_types.h ../../../deca_driver/deca_device_api.h \
+ ../../../deca_driver/deca_types.h \
+ ../../../nRF5_SDK_14.2.0/components/libraries/util/app_error.h \
+ ../../../deca_driver/deca_device_api.h \
  ../../../deca_driver/deca_param_types.h \
  ../../../deca_driver/deca_types.h ../../../deca_driver/deca_regs.h \
  ../../../deca_driver/deca_version.h ../UART/uart.h \
  D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\utils.h \
  D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_beacon.h \
  D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_scanner.h \
- D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_hybrid.h \
- D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\ble_tdoa_report.h \
- D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\anchor_calib.h \
- D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\simulation.c
+ D:\252_DATN\NRF-252\Hybrid_Positioning\Hybrid_Positioning\ss_twr_init\simulation.h
